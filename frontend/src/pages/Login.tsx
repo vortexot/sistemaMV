@@ -5,6 +5,7 @@ import { Eye, EyeOff, KeyRound, Mail, UserRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { apiErrorMessage, apiGet, apiPost } from "@/lib/api";
+import { publicAsset } from "@/lib/assets";
 import { beginSession, useSession } from "@/lib/session";
 import type { User } from "@/lib/types";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -114,7 +115,7 @@ export default function Login() {
         <div className="relative z-10 flex h-full flex-col justify-between p-10">
           <div className="flex items-center gap-3">
             <img
-              src="/mv-logo.jpg"
+              src={publicAsset("mv-logo.jpg")}
               alt="MV Multimarcas"
               width={150}
               height={150}

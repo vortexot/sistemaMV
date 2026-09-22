@@ -5,6 +5,7 @@ import { AlertTriangle, ArrowLeft, Lock, ShieldCheck, ShoppingBag } from "lucide
 import { toast } from "sonner";
 
 import { apiErrorMessage, apiGet, apiPost } from "@/lib/api";
+import { publicAsset } from "@/lib/assets";
 import { useCart, cartTotals } from "@/lib/cart";
 import { useSession } from "@/lib/session";
 import { brl } from "@/lib/format";
@@ -102,7 +103,7 @@ export default function CheckoutPage() {
     return (
       <div data-testid="checkout-page" className="mx-auto w-full max-w-2xl px-4 py-24 text-center sm:px-8">
         <img
-          src="/mv-logo.jpg"
+          src={publicAsset("mv-logo.jpg")}
           alt="MV Multimarcas"
           width={150}
           height={150}

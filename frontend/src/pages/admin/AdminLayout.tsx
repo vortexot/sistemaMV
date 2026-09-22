@@ -14,6 +14,7 @@ import {
 import { endSession, useSession } from "@/lib/session";
 import { ROLE_LABELS, type Role } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { publicAsset } from "@/lib/assets";
 import { Button } from "@/components/ui/button";
 import PageTransition from "@/components/layout/PageTransition";
 
@@ -42,7 +43,7 @@ function BrandBlock() {
   return (
     <Link to="/admin" data-testid="admin-logo" className="flex items-center gap-3">
       <img
-        src="/mv-logo.jpg"
+        src={publicAsset("mv-logo.jpg")}
         alt="MV Multimarcas"
         width={150}
         height={150}

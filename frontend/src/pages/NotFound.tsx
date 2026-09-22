@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { buttonVariants } from "@/components/ui/button";
+import { publicAsset } from "@/lib/assets";
 
 export default function NotFound() {
   return (
@@ -8,7 +9,7 @@ export default function NotFound() {
       className="flex min-h-svh flex-col items-center justify-center bg-[#0B0B0B] px-4 text-center"
     >
       <img
-        src="/mv-logo.jpg"
+        src={publicAsset("mv-logo.jpg")}
         alt="MV Multimarcas"
         width={150}
         height={150}

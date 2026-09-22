@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Shirt } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { catalogFileUrl } from "@/lib/assets";
 
 interface Props {
   fileId: string | null;
@@ -34,7 +35,7 @@ export default function ProductImage({ fileId, name, productId, className }: Pro
   return (
     <img
       data-testid={productId ? `product-image-${productId}` : "product-image"}
-      src={`/api/files/${fileId}`}
+      src={catalogFileUrl(fileId)}
       alt={name}
       width={800}
       height={1000}

@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { publicAsset } from "@/lib/assets";
 
 interface Props {
   to?: string;
@@ -23,7 +24,7 @@ export default function BrandMark({
   const content = (
     <>
       <img
-        src="/mv-logo.jpg"
+        src={publicAsset("mv-logo.jpg")}
         alt="MV Multimarcas"
         width={150}
         height={150}

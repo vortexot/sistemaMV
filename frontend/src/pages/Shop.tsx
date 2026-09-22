@@ -21,6 +21,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import ProductCard from "@/components/shop/ProductCard";
 import EmptyState from "@/components/shop/EmptyState";
 import { FAQ_ITEMS } from "@/lib/site";
+import { catalogFileUrl } from "@/lib/assets";
 
 const HERO_IMAGE_BASE = "https://images.unsplash.com/photo-1559697242-a465f2578a95";
 const HERO_IMAGE = `${HERO_IMAGE_BASE}?auto=format&fit=crop&w=1600&q=78`;
@@ -71,7 +72,7 @@ function CategoryCard({ name, slug, imageFileId }: { name: string; slug: string;
     >
       {imageFileId && (
         <img
-          src={`/api/files/${imageFileId}`}
+          src={catalogFileUrl(imageFileId)}
           alt={name}
           width={640}
           height={440}

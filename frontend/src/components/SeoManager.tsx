@@ -48,9 +48,13 @@ function upsertMeta(attribute: "name" | "property", key: string, content: string
 function absoluteBaseUrl() {
   const configured = import.meta.env.VITE_SITE_URL?.trim();
   try {
-    return new URL(configured || window.location.origin).origin;
+    return new URL(configured || import.meta.env.BASE_URL, window.location.origin)
+      .toString()
+      .replace(/\/+$/, "");
   } catch {
-    return window.location.origin;
+    return new URL(import.meta.env.BASE_URL, window.location.origin)
+      .toString()
+      .replace(/\/+$/, "");
   }
 }
 
@@ -113,8 +117,8 @@ export default function SeoManager() {
     const seo = routeSeo(location.pathname);
     const baseUrl = absoluteBaseUrl();
     const canonicalPath = location.pathname === "/" ? "/" : location.pathname;
-    const canonicalUrl = new URL(canonicalPath, `${baseUrl}/`).toString();
-    const imageUrl = new URL("/mv-logo.jpg", `${baseUrl}/`).toString();
+    const canonicalUrl = new URL(canonicalPath.replace(/^\/+/, ""), `${baseUrl}/`).toString();
+    const imageUrl = new URL("mv-logo.jpg", `${baseUrl}/`).toString();
 
     document.title = seo.title;
     upsertMeta("name", "description", seo.description);

@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { apiPost } from "@/lib/api";
+import { publicAsset } from "@/lib/assets";
 import { beginSession } from "@/lib/session";
 import type { User } from "@/lib/types";
 
@@ -35,7 +36,7 @@ export default function AuthCallback() {
       className="flex min-h-svh flex-col items-center justify-center bg-[#0B0B0B]"
     >
       <img
-        src="/mv-logo.jpg"
+        src={publicAsset("mv-logo.jpg")}
         alt="MV Multimarcas"
         width={150}
         height={150}
