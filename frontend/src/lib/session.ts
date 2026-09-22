@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiGet, apiPost } from "./api";
 import { queryClient } from "./queryClient";
 import type { User } from "./types";
+import { STATIC_CATALOG } from "./assets";
 
 export const SESSION_KEY = ["session"];
 
@@ -10,6 +11,7 @@ export function useSession() {
   const query = useQuery({
     queryKey: SESSION_KEY,
     queryFn: () => apiGet<User>("/auth/me"),
+    enabled: !STATIC_CATALOG,
     retry: false,
     staleTime: 60_000,
   });
