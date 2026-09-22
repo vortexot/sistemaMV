@@ -34,6 +34,26 @@ class Product(BaseModel):
     updated_at: datetime = Field(default_factory=utcnow)
 
 
+class CatalogProduct(BaseModel):
+    """Fields intentionally exposed by the public storefront catalog."""
+
+    id: str
+    name: str
+    sku: str
+    brand: str
+    category_name: str = ""
+    category_slug: str = ""
+    price: float
+    promo_price: float | None = None
+    in_stock: bool
+    sizes: list[str] = []
+    colors: list[str] = []
+    description: str = ""
+    tag: str | None = None
+    featured: bool = False
+    image_file_id: str | None = None
+
+
 class ProductCreate(BaseModel):
     model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
     name: str = Field(min_length=2, max_length=160)
@@ -82,6 +102,16 @@ class Category(BaseModel):
     active: bool = True
     image_file_id: str | None = None
     created_at: datetime = Field(default_factory=utcnow)
+
+
+class CatalogCategory(BaseModel):
+    """Category fields required by the public storefront."""
+
+    id: str
+    name: str
+    slug: str
+    description: str = ""
+    image_file_id: str | None = None
 
 
 class CategoryCreate(BaseModel):

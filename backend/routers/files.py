@@ -1,4 +1,4 @@
-"""File uploads (Object Storage local) and public file serving: /api/files/{file_id}."""
+"""Public image assets only. Private documents must use a separate authorized flow."""
 
 import os
 import uuid
@@ -90,6 +90,7 @@ async def upload_file(file: UploadFile, user: dict = Depends(require_roles("admi
         "content_type": mime,
         "size": len(data),
         "uploaded_by": user["id"],
+        "access": "public_asset",
         "created_at": datetime.now(timezone.utc),
         "is_deleted": False,
     }
@@ -103,7 +104,18 @@ async def upload_file(file: UploadFile, user: dict = Depends(require_roles("admi
 
 @router.get("/{file_id}")
 async def get_file(file_id: str):
-    doc = await db.files.find_one({"id": file_id, "is_deleted": False}, {"_id": 0})
+    doc = await db.files.find_one(
+        {
+            "id": file_id,
+            "is_deleted": False,
+            # Records created before classification are all admin-uploaded catalog images.
+            "$or": [
+                {"access": "public_asset"},
+                {"access": {"$exists": False}},
+            ],
+        },
+        {"_id": 0},
+    )
     if not doc:
         raise HTTPException(status_code=404, detail="Arquivo não encontrado.")
     path = Path(doc["storage_path"])

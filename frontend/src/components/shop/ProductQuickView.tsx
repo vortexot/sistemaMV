@@ -5,14 +5,14 @@ import { toast } from "sonner";
 
 import { cartUnitPrice, useCart } from "@/lib/cart";
 import { brl } from "@/lib/format";
-import { TAG_LABELS, type Product } from "@/lib/types";
+import { TAG_LABELS, type CatalogProduct } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import ProductImage from "./ProductImage";
 
 interface Props {
-  product: Product;
+  product: CatalogProduct;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -145,7 +145,7 @@ export default function ProductQuickView({ product, open, onOpenChange }: Props)
                 </button>
               </div>
               <Badge variant="outline" className="text-xs">
-                {product.stock > 0 ? `${product.stock} em estoque` : "Sem estoque"}
+                {product.in_stock ? "DisponÃ­vel" : "Sem estoque"}
               </Badge>
             </div>
 
@@ -153,11 +153,11 @@ export default function ProductQuickView({ product, open, onOpenChange }: Props)
               type="button"
               data-testid={`quick-view-add-${product.id}`}
               onClick={handleAdd}
-              disabled={product.stock <= 0}
+              disabled={!product.in_stock}
               className="mt-5 min-h-11 w-full gap-2 bg-[#DAA520] font-bold uppercase tracking-wide text-[#0B0B0B] hover:bg-[#A07C1B]"
             >
               <ShoppingBag className="h-4 w-4" />
-              {product.stock <= 0 ? "Esgotado" : "Adicionar ao carrinho"}
+              {!product.in_stock ? "Esgotado" : "Adicionar ao carrinho"}
             </Button>
             <p className="mt-3 text-center text-xs text-[#BDBDBD]">SKU {product.sku}</p>
           </div>

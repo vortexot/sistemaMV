@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 
 import { apiGet } from "@/lib/api";
-import type { Category, Product } from "@/lib/types";
+import type { CatalogCategory, CatalogProduct } from "@/lib/types";
 import { Button, buttonVariants } from "@/components/ui/button";
 import ProductCard from "@/components/shop/ProductCard";
 import EmptyState from "@/components/shop/EmptyState";
@@ -45,15 +45,15 @@ const normalize = (value: string) =>
     .toLowerCase()
     .trim();
 
-const FALLBACK_CATEGORIES: Category[] = [
-  { id: "camisas", name: "Camisas", slug: "camisas", description: "", order: 1, active: true, image_file_id: null, created_at: "" },
-  { id: "moletons", name: "Moletons", slug: "moletons", description: "", order: 2, active: true, image_file_id: null, created_at: "" },
-  { id: "tenis", name: "Tênis", slug: "tenis", description: "", order: 3, active: true, image_file_id: null, created_at: "" },
-  { id: "calcas", name: "Calças", slug: "calcas", description: "", order: 4, active: true, image_file_id: null, created_at: "" },
-  { id: "shorts", name: "Shorts", slug: "shorts", description: "", order: 5, active: true, image_file_id: null, created_at: "" },
-  { id: "acessorios", name: "Acessórios", slug: "acessorios", description: "", order: 6, active: true, image_file_id: null, created_at: "" },
-];
-const EMPTY_PRODUCTS: Product[] = [];
+const FALLBACK_CATEGORIES = [
+  { id: "camisas", name: "Camisas", slug: "camisas", description: "", image_file_id: null },
+  { id: "moletons", name: "Moletons", slug: "moletons", description: "", image_file_id: null },
+  { id: "tenis", name: "Tênis", slug: "tenis", description: "", image_file_id: null },
+  { id: "calcas", name: "Calças", slug: "calcas", description: "", image_file_id: null },
+  { id: "shorts", name: "Shorts", slug: "shorts", description: "", image_file_id: null },
+  { id: "acessorios", name: "Acessórios", slug: "acessorios", description: "", image_file_id: null },
+] as CatalogCategory[];
+const EMPTY_PRODUCTS: CatalogProduct[] = [];
 interface CustomerStory {
   title: string;
   summary: string;
@@ -169,12 +169,12 @@ export default function Shop() {
 
   const productsQuery = useQuery({
     queryKey: ["catalog", "products"],
-    queryFn: () => apiGet<Product[]>("/catalog/products"),
+    queryFn: () => apiGet<CatalogProduct[]>("/catalog/products"),
     retry: false,
   });
   const categoriesQuery = useQuery({
     queryKey: ["catalog", "categories"],
-    queryFn: () => apiGet<Category[]>("/catalog/categories"),
+    queryFn: () => apiGet<CatalogCategory[]>("/catalog/categories"),
     retry: false,
   });
 

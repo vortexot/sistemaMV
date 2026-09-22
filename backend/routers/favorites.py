@@ -7,14 +7,14 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from lib.db import db
 from lib.security import get_current_user
-from models.catalog import Product
-from routers.catalog import _category_map, _product_out
+from models.catalog import CatalogProduct
+from routers.catalog import _catalog_product_out, _category_map
 
 router = APIRouter(prefix="/favorites")
 
 
-@router.get("", response_model=list[Product])
-async def my_favorites(user: dict = Depends(get_current_user)) -> list[Product]:
+@router.get("", response_model=list[CatalogProduct])
+async def my_favorites(user: dict = Depends(get_current_user)) -> list[CatalogProduct]:
     favs = await db.favorites.find({"user_id": user["id"]}, {"_id": 0}).to_list(200)
     ids = [fav["product_id"] for fav in favs]
     if not ids:
@@ -23,7 +23,7 @@ async def my_favorites(user: dict = Depends(get_current_user)) -> list[Product]:
     cats = await _category_map()
     by_id = {doc["id"]: doc for doc in docs}
     ordered = [by_id[i] for i in ids if i in by_id]
-    return [_product_out(doc, cats) for doc in ordered]
+    return [_catalog_product_out(doc, cats) for doc in ordered]
 
 
 @router.post("/{product_id}/toggle")

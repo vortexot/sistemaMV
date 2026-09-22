@@ -8,7 +8,7 @@ import { apiErrorMessage, apiGet, apiPost } from "@/lib/api";
 import { cartUnitPrice, useCart } from "@/lib/cart";
 import { brl } from "@/lib/format";
 import { useSession } from "@/lib/session";
-import { TAG_LABELS, type Product } from "@/lib/types";
+import { TAG_LABELS, type CatalogProduct } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import ProductImage from "./ProductImage";
 import ProductQuickView from "./ProductQuickView";
@@ -19,7 +19,7 @@ const TAG_STYLES: Record<string, string> = {
   mais_vendido: "bg-[#A07C1B] text-[#0B0B0B]",
 };
 
-export default function ProductCard({ product, index = 0 }: { product: Product; index?: number }) {
+export default function ProductCard({ product, index = 0 }: { product: CatalogProduct; index?: number }) {
   const { add } = useCart();
   const { user } = useSession();
   const navigate = useNavigate();
@@ -28,7 +28,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
 
   const favoritesQuery = useQuery({
     queryKey: ["favorites"],
-    queryFn: () => apiGet<Product[]>("/favorites"),
+    queryFn: () => apiGet<CatalogProduct[]>("/favorites"),
     enabled: !!user,
     retry: false,
   });
@@ -127,7 +127,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
             <span className="text-sm text-[#BDBDBD] line-through">{brl(product.price)}</span>
           )}
         </div>
-        {product.stock <= 0 && (
+        {!product.in_stock && (
           <span className="mt-1 text-xs font-bold uppercase tracking-wider text-[#DC2626]">
             Sem estoque
           </span>
@@ -136,12 +136,12 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
           type="button"
           data-testid={`add-cart-product-${product.id}`}
           onClick={handleAdd}
-          disabled={product.stock <= 0}
+          disabled={!product.in_stock}
           variant="outline"
           className="mt-4 min-h-11 w-full gap-2 border-[#242424] bg-[#151515] font-bold uppercase tracking-wide text-white hover:border-[#DAA520] hover:bg-[#DAA520] hover:text-[#0B0B0B]"
         >
           <ShoppingBag className="h-4 w-4" />
-          {product.stock <= 0 ? "Esgotado" : "Adicionar"}
+          {!product.in_stock ? "Esgotado" : "Adicionar"}
         </Button>
       </div>
       <ProductQuickView product={product} open={quickViewOpen} onOpenChange={setQuickViewOpen} />

@@ -48,6 +48,15 @@ export default defineConfig(async () => {
     ],
     resolve: {
       alias: [
+        {
+          find: "@/admin/AdminRoutes",
+          replacement: path.resolve(
+            __dirname,
+            process.env.VITE_STATIC_CATALOG === "true"
+              ? "./src/admin/DisabledAdminRoutes.tsx"
+              : "./src/admin/AdminRoutes.tsx",
+          ),
+        },
         { find: "@", replacement: path.resolve(__dirname, "./src") },
         // lucide 1.x dropped brand logos; src/lib/lucide-react.tsx restores them on top of the real package.
         { find: /^lucide-react$/, replacement: path.resolve(__dirname, "./src/lib/lucide-react.tsx") },

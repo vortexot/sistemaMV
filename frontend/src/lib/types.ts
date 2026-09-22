@@ -34,6 +34,24 @@ export interface Product {
   updated_at: string;
 }
 
+export interface CatalogProduct {
+  id: string;
+  name: string;
+  sku: string;
+  brand: string;
+  category_name: string;
+  category_slug: string;
+  price: number;
+  promo_price: number | null;
+  in_stock: boolean;
+  sizes: string[];
+  colors: string[];
+  description: string;
+  tag: string | null;
+  featured: boolean;
+  image_file_id: string | null;
+}
+
 export interface Category {
   id: string;
   name: string;
@@ -43,6 +61,14 @@ export interface Category {
   active: boolean;
   image_file_id: string | null;
   created_at: string;
+}
+
+export interface CatalogCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  image_file_id: string | null;
 }
 
 export interface Banner {

@@ -271,6 +271,12 @@ Não foi criada outra infraestrutura: coleção **`banners`**, APIs `/api/admin/
 
 Instale a nova dependência **Pillow** usando `pip install -r backend/requirements.txt` no ambiente Python do backend. Mantenha `MONGO_URL`, `DB_NAME`, autenticação e `STORAGE_DIR` já configurados; o padrão dos arquivos é `backend/storage/uploads`. Faça backup do banco **e** dessa pasta e use volume persistente em produção. Reinicie o backend após instalar a dependência. Execute frontend e backend conforme a seção Running; em produção, reconstrua o frontend e mantenha o proxy `/api` e fallback das rotas SPA.
 
+### Proxy reverso e rate limiting em produção
+
+O backend limita requisições pelo endereço que o Uvicorn entrega em `request.client.host` e não confia diretamente em `X-Forwarded-For` enviado pelo cliente. Atrás de um proxy, configure `FORWARDED_ALLOW_IPS` com o IP ou CIDR exato do proxy confiável e inicie o Uvicorn com `--proxy-headers --forwarded-allow-ips "$FORWARDED_ALLOW_IPS"`. O proxy deve substituir os cabeçalhos de encaminhamento recebidos e o acesso direto à origem deve ser bloqueado. Nunca use `*` em uma origem exposta à internet.
+
+O GitHub Pages publica apenas a prévia estática do catálogo. O fluxo definido em `.github/workflows/pages.yml` compila com `VITE_STATIC_CATALOG=true`, exclui as telas administrativas do bundle e não disponibiliza login, pedidos, pagamentos, banco de dados ou APIs. A operação completa exige frontend e backend na mesma origem HTTPS (ou configuração explícita de CORS), MongoDB e armazenamento persistentes.
+
 ## Como alterar as informações visuais da página
 
 Os caminhos abaixo são reais. Em desenvolvimento, alterações em TSX/CSS aparecem pelo Vite (salve e atualize a página se necessário), sem reiniciar normalmente. Se `DISABLE_HOT_RELOAD=true`, reinicie o servidor de desenvolvimento. **Em produção, toda alteração de código/arquivo estático exige novo build/publicação do frontend**. Alterações de promoções no Admin não exigem build nem reinício.

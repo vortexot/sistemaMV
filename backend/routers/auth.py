@@ -129,7 +129,7 @@ async def refresh(request: Request, response: Response) -> UserPublic:
     user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0})
     if (
         not user
-        or user.get("status") == "bloqueado"
+        or user.get("status") != "ativo"
         or payload.get("tv", 0) != user.get("token_version", 0)
     ):
         raise HTTPException(status_code=401, detail="Sessão expirada.")
@@ -162,7 +162,25 @@ async def forgot_password(input: ForgotPasswordIn, request: Request) -> MessageO
     await _rate_limit(request, 'forgot', email, 5)
     endpoint, secret = os.getenv('RESET_WEBHOOK_URL', ''), os.getenv('RESET_WEBHOOK_TOKEN', '')
     parsed = urlsplit(endpoint)
-    if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password or not secret:
+    allowed_hosts = {
+        host.strip().lower().rstrip('.')
+        for host in os.getenv('RESET_WEBHOOK_ALLOWED_HOSTS', '').split(',')
+        if host.strip()
+    }
+    endpoint_host = (parsed.hostname or '').lower().rstrip('.')
+    try:
+        endpoint_port = parsed.port
+    except ValueError:
+        endpoint_port = -1
+    if (
+        parsed.scheme != 'https'
+        or not endpoint_host
+        or endpoint_host not in allowed_hosts
+        or endpoint_port not in (None, 443)
+        or parsed.username
+        or parsed.password
+        or not secret
+    ):
         raise HTTPException(503, 'Recuperação por e-mail indisponível. Fale com o administrador.')
     user = await db.users.find_one({"email": email}, {"_id": 0})
     if not user:

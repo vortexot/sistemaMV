@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { apiErrorMessage, apiGet, apiPost } from "@/lib/api";
 import { endSession, useSession } from "@/lib/session";
 import { brl, formatDate } from "@/lib/format";
-import { ORDER_STATUS_LABELS, ROLE_LABELS, type Order, type Product } from "@/lib/types";
+import { ORDER_STATUS_LABELS, ROLE_LABELS, type CatalogProduct, type Order } from "@/lib/types";
 import { Button, buttonVariants } from "@/components/ui/button";
 import EmptyState from "@/components/shop/EmptyState";
 import ProductImage from "@/components/shop/ProductImage";
@@ -34,7 +34,7 @@ export default function Dashboard() {
   });
   const favoritesQuery = useQuery({
     queryKey: ["favorites"],
-    queryFn: () => apiGet<Product[]>("/favorites"),
+    queryFn: () => apiGet<CatalogProduct[]>("/favorites"),
     enabled: !!user,
     retry: false,
   });

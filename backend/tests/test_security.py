@@ -38,6 +38,7 @@ async def secure(monkeypatch):
     monkeypatch.setenv('GOOGLE_AUTH_ENABLED', 'false')
     monkeypatch.delenv('RESET_WEBHOOK_URL', raising=False)
     monkeypatch.delenv('RESET_WEBHOOK_TOKEN', raising=False)
+    monkeypatch.delenv('RESET_WEBHOOK_ALLOWED_HOSTS', raising=False)
     delivery = []
     async def fake_network(transport, request):
         if request.url == 'https://reset.test/deliver':
@@ -54,7 +55,10 @@ async def secure(monkeypatch):
         users[role] = user
     await db.products.insert_one({'id': 'product', 'name': 'Synthetic product', 'sku': 'SYN', 'brand': 'Test', 'category_id': 'cat',
                                  'price': 10.25, 'promo_price': None, 'stock': 5, 'active': True, 'archived': False, 'created_at': utcnow()})
-    await db.categories.insert_one({'id': 'cat', 'name': 'Synthetic', 'slug': 'synthetic', 'created_at': utcnow()})
+    await db.categories.insert_one({
+        'id': 'cat', 'name': 'Synthetic', 'slug': 'synthetic', 'description': '',
+        'image_file_id': None, 'active': True, 'created_at': utcnow(),
+    })
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='https://shop.test', headers={'Origin': 'https://shop.test'}) as api:
         def headers(role='comprador'):
             return {'Authorization': 'Bearer ' + security.create_access_token(users[role])}
@@ -75,6 +79,20 @@ async def test_anonymous_and_buyer_cannot_admin(secure):
     assert (await secure.api.patch('/api/admin/customers/admin', json={'role': 'admin'}, headers=secure.headers())).status_code == 403
 
 
+async def test_public_catalog_uses_minimal_response_models(secure):
+    product = (await secure.api.get('/api/catalog/products')).json()[0]
+    assert set(product) == {
+        'id', 'name', 'sku', 'brand', 'category_name', 'category_slug', 'price',
+        'promo_price', 'in_stock', 'sizes', 'colors', 'description', 'tag',
+        'featured', 'image_file_id',
+    }
+    assert product['in_stock'] is True
+    assert not {'stock', 'active', 'archived', 'category_id', 'created_at', 'updated_at'} & set(product)
+
+    category = (await secure.api.get('/api/catalog/categories')).json()[0]
+    assert set(category) == {'id', 'name', 'slug', 'description', 'image_file_id'}
+
+
 async def test_reset_never_returns_secret_when_unconfigured(secure):
     for email in ('admin@example.com', 'missing@example.com'):
         response = await secure.api.post('/api/auth/forgot-password', json={'email': email})
@@ -86,6 +104,7 @@ async def test_reset_never_returns_secret_when_unconfigured(secure):
 async def test_reset_single_use_hash_expiry_revocation(secure, monkeypatch):
     monkeypatch.setenv('RESET_WEBHOOK_URL', 'https://reset.test/deliver')
     monkeypatch.setenv('RESET_WEBHOOK_TOKEN', 'synthetic-not-a-credential')
+    monkeypatch.setenv('RESET_WEBHOOK_ALLOWED_HOSTS', 'reset.test')
     response = await secure.api.post('/api/auth/forgot-password', json={'email': 'comprador@example.com'})
     missing = await secure.api.post('/api/auth/forgot-password', json={'email': 'missing@example.com'})
     assert response.json() == missing.json()
@@ -100,6 +119,16 @@ async def test_reset_single_use_hash_expiry_revocation(secure, monkeypatch):
     assert security.verify_password(PASSWORD, (await secure.db.users.find_one({'id': 'comprador'}))['password_hash'])
     await secure.db.password_reset_tokens.insert_one({'token': hashlib.sha256(b'x'*48).hexdigest(), 'user_id': 'admin', 'used': False, 'expires_at': utcnow()-timedelta(seconds=1)})
     assert (await secure.api.post('/api/auth/reset-password', json={'token': 'x'*48, 'new_password': PASSWORD})).status_code == 400
+
+
+async def test_reset_webhook_rejects_non_allowlisted_destination(secure, monkeypatch):
+    monkeypatch.setenv('RESET_WEBHOOK_URL', 'https://untrusted.test/deliver')
+    monkeypatch.setenv('RESET_WEBHOOK_TOKEN', 'synthetic-not-a-credential')
+    monkeypatch.setenv('RESET_WEBHOOK_ALLOWED_HOSTS', 'reset.test')
+    response = await secure.api.post('/api/auth/forgot-password', json={'email': 'comprador@example.com'})
+    assert response.status_code == 503
+    assert not secure.delivery
+    assert await secure.db.password_reset_tokens.count_documents({}) == 0
 
 
 async def test_refresh_rotation_and_logout_revoke_copied_tokens(secure):
@@ -139,6 +168,23 @@ async def test_login_rate_pair_does_not_lock_other_source(secure):
     assert (await secure.api.post('/api/auth/login', json={'email': 'admin@example.com', 'password': 'wrong'})).status_code == 429
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app, client=('127.0.0.2', 4321)), base_url='https://shop.test') as other:
         assert (await other.post('/api/auth/login', json={'email': 'admin@example.com', 'password': 'wrong'})).status_code == 401
+
+
+async def test_forwarding_headers_do_not_bypass_rate_limit(secure):
+    for index in range(10):
+        headers = {'X-Forwarded-For': f'198.51.100.{index}', 'X-Real-IP': f'203.0.113.{index}'}
+        response = await secure.api.post(
+            '/api/auth/login',
+            json={'email': 'comprador@example.com', 'password': 'wrong'},
+            headers=headers,
+        )
+        assert response.status_code == 401
+    response = await secure.api.post(
+        '/api/auth/login',
+        json={'email': 'comprador@example.com', 'password': 'wrong'},
+        headers={'X-Forwarded-For': '192.0.2.99'},
+    )
+    assert response.status_code == 429
 
 
 async def test_google_disabled_and_no_password_does_not_crash(secure):
@@ -240,3 +286,20 @@ async def test_storage_path_cannot_escape(secure, tmp_path, monkeypatch):
     await secure.db.files.insert_one({'id': 'outside', 'is_deleted': False, 'storage_path': str(outside), 'content_type': 'image/png'})
     response = await secure.api.get('/api/files/outside')
     assert response.status_code == 404 and 'SENSITIVE-MARKER' not in response.text
+
+
+async def test_private_file_is_never_served_by_public_asset_route(secure, tmp_path, monkeypatch):
+    root = tmp_path / 'uploads'
+    root.mkdir()
+    private = root / 'private.png'
+    private.write_bytes(b'private-file-marker')
+    monkeypatch.setattr(files, 'STORAGE_DIR', root)
+    await secure.db.files.insert_one({
+        'id': 'private',
+        'is_deleted': False,
+        'access': 'private_file',
+        'storage_path': str(private),
+        'content_type': 'image/png',
+    })
+    response = await secure.api.get('/api/files/private')
+    assert response.status_code == 404 and 'private-file-marker' not in response.text
