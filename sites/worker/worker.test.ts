@@ -1,0 +1,101 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
+import { readFileSync, readdirSync } from 'node:fs';
+import { webcrypto } from 'node:crypto';
+import worker from './index.ts';
+import { passwordHash, digest } from './auth.ts';
+
+test('hosted shop: persistence, authentication, roles, indoor media and atomic stock',async()=>{
+  const sqlite=new DatabaseSync(':memory:');
+  for(const name of readdirSync('drizzle').filter(n=>n.endsWith('.sql')).sort())sqlite.exec(readFileSync('drizzle/'+name,'utf8'));
+  const prepare=(sql:string)=>({bind:(...args:any[])=>({sql,args,first:async()=>sqlite.prepare(sql).get(...args),all:async()=>({results:sqlite.prepare(sql).all(...args)}),run:async()=>({meta:sqlite.prepare(sql).run(...args)})})});
+  const env:any={DB:{prepare,batch:async(stmts:any[])=>{sqlite.exec('BEGIN');try{const result=stmts.map(s=>({meta:sqlite.prepare(s.sql).run(...s.args)}));sqlite.exec('COMMIT');return result;}catch(e){sqlite.exec('ROLLBACK');throw e;}}},BUCKET:{},ASSETS:{fetch:async()=>new Response('asset')},BOOTSTRAP_ADMIN_EMAIL:'admin@example.com',BOOTSTRAP_ADMIN_HASH:await passwordHash('TestPass!123')};
+  async function call(path:string,method='GET',data?:any,cookie='',origin='https://shop.test',ip='192.0.2.1'){
+    if(path==='/orders'&&data&&!data.idempotency_key)data={...data,idempotency_key:crypto.randomUUID()};
+    return worker.fetch(new Request('https://shop.test/api'+path,{method,headers:{'Content-Type':'application/json',cookie,origin,'cf-connecting-ip':ip},body:data===undefined?undefined:JSON.stringify(data)}),env);
+  }
+  const realFetch=globalThis.fetch;
+  globalThis.fetch=async()=>{throw new Error('External network forbidden in isolated tests');};
+  test.after(()=>{globalThis.fetch=realFetch;sqlite.close();});
+  const catalog=await (await call('/catalog/products')).json() as any[];assert.equal(catalog.length,10);
+  assert.equal((await call('/catalog/banners')).status,404);
+  assert.equal((await call('/admin/indoor')).status,401);
+  const login=await call('/auth/login','POST',{email:'admin@example.com',password:'TestPass!123'});assert.equal(login.status,200);const admin=login.headers.get('set-cookie')!.split(';')[0];
+  assert.equal((await call('/admin/indoor','GET',undefined,admin)).status,200);
+  assert.equal((await call('/auth/login','POST',{email:'admin@example.com',password:'bad'})).status,401);
+  const reg=await call('/auth/register','POST',{name:'Cliente',email:'client@example.com',password:'Synthetic ClientPass!123'});assert.equal(reg.status,200);const client=reg.headers.get('set-cookie')!.split(';')[0];
+  const clientUser:any=await reg.json();
+  assert.ok(reg.headers.get('set-cookie')?.includes('HttpOnly'));
+  assert.ok(reg.headers.get('set-cookie')?.includes('Secure'));
+  assert.ok(reg.headers.get('content-security-policy')?.includes("frame-ancestors 'none'"));
+  assert.equal((await call('/admin/indoor','GET',undefined,client)).status,403);
+  assert.equal((await call('/admin/products','GET',undefined,client)).status,403);
+  assert.equal((await call('/auth/logout','POST',null,admin,'https://evil.test')).status,403);
+  assert.equal((await call('/auth/forgot-password','POST',{email:'admin@example.com'})).status,503);
+  const item=catalog.find(p=>p.stock>0);assert.ok(item);
+  assert.equal((await call('/favorites/'+item.id+'/toggle','POST',null,client)).status,200);
+  assert.equal(((await (await call('/favorites','GET',undefined,client)).json()) as any[]).length,1);
+  assert.equal((await call('/admin/products/'+item.id,'PATCH',{stock:-1},admin)).status,422);
+  assert.equal((await call('/orders','POST',{items:[{product_id:item.id,qty:1}]},client)).status,503);
+  env.PAYPAL_CLIENT_ID='test';env.PAYPAL_CLIENT_SECRET='test';
+  env.PAYMENTS_PAUSED='false';
+  const created=await call('/orders','POST',{items:[{product_id:item.id,qty:1},{product_id:item.id,qty:1}]},client);assert.equal(created.status,200);const order:any=await created.json();assert.equal(order.items[0].qty,2);
+  const stock=()=>JSON.parse((sqlite.prepare("SELECT data FROM records WHERE kind='products' AND id=?").get(item.id) as any).data).stock;
+  assert.equal(stock(),item.stock-2);
+  assert.equal((await call('/payments/paypal/cancel','POST',{order_id:order.id},client)).status,200);
+  await call('/payments/paypal/cancel','POST',{order_id:order.id},client);assert.equal(stock(),item.stock);
+  const low={...catalog[0],stock:1};sqlite.prepare("UPDATE records SET data=? WHERE kind='products' AND id=?").run(JSON.stringify(low),low.id);
+  const results=await Promise.all([call('/orders','POST',{items:[{product_id:low.id,qty:1}]},client),call('/orders','POST',{items:[{product_id:low.id,qty:1}]},client)]);
+  assert.deepEqual(results.map(r=>r.status).sort(),[200,409]);
+  const activeOrder:any=await results.find(r=>r.status===200)!.json();
+  assert.equal((await call('/orders/'+activeOrder.id,'GET',undefined,admin)).status,404);
+  assert.equal((await call('/payments/paypal/cancel','POST',{order_id:activeOrder.id},admin)).status,404);
+  assert.equal((await call('/admin/orders/'+activeOrder.id,'PATCH',{status:'entregue'},admin)).status,409);
+  assert.equal((await call('/payments/paypal/webhook','POST',{status:'COMPLETED'})).status,401);
+  assert.equal((await call('/auth/google/session','POST',{session_id:'fake'})).status,503);
+
+  const req={idempotency_key:crypto.randomUUID(),items:[{product_id:catalog[1].id,qty:1}]};
+  const repeated=await Promise.all([call('/orders','POST',req,client),call('/orders','POST',req,client)]);
+  assert.deepEqual(repeated.map(r=>r.status),[200,200]);
+  const first:any=await repeated[0].json(),second:any=await repeated[1].json();assert.equal(first.id,second.id);
+  assert.equal((await call('/orders','POST',{...req,items:[{product_id:catalog[1].id,qty:2}]},client)).status,409);
+  const cancels=await Promise.all([call('/payments/paypal/cancel','POST',{order_id:first.id},client),call('/payments/paypal/cancel','POST',{order_id:first.id},client)]);
+  assert.deepEqual(cancels.map(r=>r.status),[200,200]);
+  assert.equal((await call('/payments/paypal/capture','POST',{order_id:first.id},client)).status,409);
+
+  sqlite.prepare("UPDATE records SET data=json_set(data,'$.paypal_order_id','provider-test') WHERE kind='orders' AND id=?").run(activeOrder.id);
+  const providerKeys:string[]=[];
+  globalThis.fetch=async(_url,options)=>{
+    if(String(_url).endsWith('/oauth2/token'))return Response.json({access_token:'synthetic'});
+    assert.ok(String(_url).startsWith('https://api-m.sandbox.paypal.com/'));
+    providerKeys.push(new Headers(options?.headers).get('PayPal-Request-Id')||'');
+    return Response.json({id:'provider-test',status:'COMPLETED',purchase_units:[{payments:{captures:[{status:'COMPLETED',amount:{currency_code:'USD',value:'0.01'}}]}}]});
+  };
+  for(let i=0;i<2;i++)assert.equal((await call('/payments/paypal/capture','POST',{order_id:activeOrder.id},client)).status,409);
+  assert.equal(providerKeys[0],providerKeys[1]);assert.ok(providerKeys[0].length<=38);
+  assert.equal((await call('/payments/paypal/cancel','POST',{order_id:activeOrder.id},client)).status,409);
+
+  const rotated=await Promise.all([call('/auth/refresh','POST',null,client),call('/auth/refresh','POST',null,client)]);
+  assert.deepEqual(rotated.map(r=>r.status).sort(),[200,401]);
+  const freshClient=rotated.find(r=>r.status===200)!.headers.get('set-cookie')!.split(';')[0];
+  assert.equal((await call('/auth/me','GET',undefined,client)).status,401);
+  assert.equal((await call('/admin/customers/'+clientUser.id,'PATCH',{role:'atendente'},admin)).status,200);
+  assert.equal((await call('/auth/me','GET',undefined,freshClient)).status,401);
+
+  let resetToken='';
+  env.RESET_WEBHOOK_URL='https://reset.test/deliver';env.RESET_WEBHOOK_TOKEN='synthetic';
+  globalThis.fetch=async(_url,options)=>{assert.equal(_url,env.RESET_WEBHOOK_URL);resetToken=JSON.parse(String(options?.body)).token;return Response.json({ok:true});};
+  const resetResponse=await call('/auth/forgot-password','POST',{email:'client@example.com'});
+  const missingResponse=await call('/auth/forgot-password','POST',{email:'missing@example.com'});
+  assert.deepEqual(await resetResponse.json(),await missingResponse.json());
+  const resetDoc=JSON.parse((sqlite.prepare("SELECT data FROM records WHERE kind='resets'").get() as any).data);
+  assert.equal(resetDoc.id,await digest(resetToken));assert.ok(!JSON.stringify(resetDoc).includes(resetToken));
+  const resetResults=await Promise.all([call('/auth/reset-password','POST',{token:resetToken,new_password:'New synthetic password 456!'}),call('/auth/reset-password','POST',{token:resetToken,new_password:'New synthetic password 456!'})]);
+  assert.deepEqual(resetResults.map(r=>r.status).sort(),[200,400]);
+  for(let i=0;i<10;i++)await call('/auth/login','POST',{email:'admin@example.com',password:'wrong'});
+  assert.equal((await call('/auth/login','POST',{email:'admin@example.com',password:'TestPass!123'})).status,429);
+  assert.equal((await call('/auth/login','POST',{email:'admin@example.com',password:'wrong'},'','https://shop.test','192.0.2.2')).status,401);
+  assert.equal((await call('/files/upload','POST',null,client)).status,401);
+  await call('/auth/logout','POST',null,admin);assert.equal((await call('/admin/indoor','GET',undefined,admin)).status,401);
+});

@@ -1,0 +1,206 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "09d1edb3-e39c-4b28-8582-d44db9836e58",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "tables": {
+    "login_attempts": {
+      "name": "login_attempts",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "count": {
+          "name": "count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "expires": {
+          "name": "expires",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "records": {
+      "name": "records",
+      "columns": {
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "data": {
+          "name": "data",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "unique_user_email": {
+          "name": "unique_user_email",
+          "columns": [
+            "json_extract(\"data\", '$.email')"
+          ],
+          "isUnique": true,
+          "where": "\"records\".\"kind\" = 'users'"
+        },
+        "unique_product_sku": {
+          "name": "unique_product_sku",
+          "columns": [
+            "json_extract(\"data\", '$.sku')"
+          ],
+          "isUnique": true,
+          "where": "\"records\".\"kind\" = 'products'"
+        },
+        "unique_category_slug": {
+          "name": "unique_category_slug",
+          "columns": [
+            "json_extract(\"data\", '$.slug')"
+          ],
+          "isUnique": true,
+          "where": "\"records\".\"kind\" = 'categories'"
+        },
+        "order_customer": {
+          "name": "order_customer",
+          "columns": [
+            "json_extract(\"data\", '$.user_id')"
+          ],
+          "isUnique": false,
+          "where": "\"records\".\"kind\" = 'orders'"
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "records_kind_id_pk": {
+          "columns": [
+            "kind",
+            "id"
+          ],
+          "name": "records_kind_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "valid_json": {
+          "name": "valid_json",
+          "value": "json_valid(\"records\".\"data\")"
+        },
+        "nonnegative_stock": {
+          "name": "nonnegative_stock",
+          "value": "\"records\".\"kind\" != 'products' OR json_extract(\"records\".\"data\", '$.stock') >= 0"
+        }
+      }
+    },
+    "sessions": {
+      "name": "sessions",
+      "columns": {
+        "hash": {
+          "name": "hash",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires": {
+          "name": "expires",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "session_user": {
+          "name": "session_user",
+          "columns": [
+            "user_id"
+          ],
+          "isUnique": false
+        },
+        "session_expiry": {
+          "name": "session_expiry",
+          "columns": [
+            "expires"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {
+      "unique_user_email": {
+        "columns": {
+          "json_extract(\"data\", '$.email')": {
+            "isExpression": true
+          }
+        }
+      },
+      "unique_product_sku": {
+        "columns": {
+          "json_extract(\"data\", '$.sku')": {
+            "isExpression": true
+          }
+        }
+      },
+      "unique_category_slug": {
+        "columns": {
+          "json_extract(\"data\", '$.slug')": {
+            "isExpression": true
+          }
+        }
+      },
+      "order_customer": {
+        "columns": {
+          "json_extract(\"data\", '$.user_id')": {
+            "isExpression": true
+          }
+        }
+      }
+    }
+  }
+}
