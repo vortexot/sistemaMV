@@ -13,7 +13,7 @@ export default function PublicLayout() {
         Ir para o conteúdo principal
       </a>
       <Header />
-      <main id="conteudo-principal" className="flex-1 pt-20" tabIndex={-1}>
+      <main id="conteudo-principal" className="flex-1 pt-[calc(5rem+env(safe-area-inset-top))]" tabIndex={-1}>
         <PageTransition>
           <Outlet />
         </PageTransition>

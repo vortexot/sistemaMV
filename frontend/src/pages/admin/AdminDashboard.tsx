@@ -52,7 +52,7 @@ export default function AdminDashboard() {
   const data = query.data;
 
   return (
-    <div data-testid="admin-dashboard-page" className="space-y-6">
+    <div data-testid="admin-dashboard-page" className="min-w-0 space-y-6">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#DAA520]">
           Painel administrativo
@@ -104,12 +104,11 @@ export default function AdminDashboard() {
                   {data.low_stock.map((item: LowStockItem) => (
                     <li
                       key={item.id}
-                      className="flex items-center justify-between rounded-lg bg-[#0B0B0B] px-4 py-2.5 text-sm"
+                      className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-[#0B0B0B] px-4 py-3 text-sm"
                     >
-                      <span className="truncate text-white">{item.name}</span>
-                      <span className="ml-3 shrink-0 text-xs text-[#BDBDBD]">{item.sku}</span>
+                      <span className="min-w-0 flex-1 truncate text-white">{item.name}</span>
                       <span
-                        className={`ml-3 rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                        className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold ${
                           item.stock === 0
                             ? "bg-red-500/15 text-red-400"
                             : "bg-amber-400/15 text-amber-300"
@@ -117,6 +116,7 @@ export default function AdminDashboard() {
                       >
                         {item.stock} un.
                       </span>
+                      <span className="order-3 w-full break-all text-xs text-[#BDBDBD] sm:order-none sm:w-auto sm:shrink-0">{item.sku}</span>
                     </li>
                   ))}
                 </ul>

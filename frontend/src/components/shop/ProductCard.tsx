@@ -95,7 +95,7 @@ export default function ProductCard({ product, index = 0 }: { product: CatalogPr
           aria-label={isFavorite ? `Remover ${product.name} dos favoritos` : `Adicionar ${product.name} aos favoritos`}
           aria-pressed={isFavorite}
           disabled={favoriteToggle.isPending}
-          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-[#0B0B0B]/90 transition-colors hover:text-[#DAA520]"
+          className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full bg-[#0B0B0B]/90 transition-colors hover:text-[#DAA520]"
         >
           <Heart className={isFavorite ? "h-4 w-4 fill-[#DAA520] text-[#DAA520]" : "h-4 w-4 text-white"} />
         </button>
@@ -104,12 +104,12 @@ export default function ProductCard({ product, index = 0 }: { product: CatalogPr
           data-testid={`quick-view-product-${product.id}`}
           onClick={() => setQuickViewOpen(true)}
           aria-label={`Ver detalhes de ${product.name}`}
-          className="absolute inset-x-3 bottom-3 flex items-center justify-center gap-2 rounded-lg border border-[#DAA520]/40 bg-[#0B0B0B]/92 py-2.5 text-xs font-bold uppercase tracking-wider text-[#DAA520] transition-all duration-300 hover:bg-[#DAA520] hover:text-[#0B0B0B] md:translate-y-3 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100 md:group-focus-within:translate-y-0 md:group-focus-within:opacity-100"
+          className="absolute inset-x-3 bottom-3 flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[#DAA520]/40 bg-[#0B0B0B]/92 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#DAA520] transition-all duration-300 hover:bg-[#DAA520] hover:text-[#0B0B0B] md:translate-y-3 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100 md:group-focus-within:translate-y-0 md:group-focus-within:opacity-100"
         >
           <Eye className="h-3.5 w-3.5" /> Vista rápida
         </button>
       </div>
-      <div className="flex flex-1 flex-col p-5">
+      <div className="flex flex-1 flex-col p-4 sm:p-5">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#BDBDBD]">
           {product.brand} · {product.category_name}
         </p>

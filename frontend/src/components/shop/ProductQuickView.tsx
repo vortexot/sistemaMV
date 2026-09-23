@@ -45,7 +45,7 @@ export default function ProductQuickView({ product, open, onOpenChange }: Props)
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         data-testid={`quick-view-dialog-${product.id}`}
-        className="max-h-[92svh] overflow-y-auto border-[#242424] bg-[#151515] p-0 sm:max-w-3xl"
+        className="overflow-y-auto border-[#242424] bg-[#151515] p-0 sm:max-w-3xl"
       >
         <div className="grid gap-0 sm:grid-cols-2">
           {/* image with zoom */}
@@ -63,7 +63,7 @@ export default function ProductQuickView({ product, open, onOpenChange }: Props)
                 setZoomed((z) => !z);
               }
             }}
-            className="relative aspect-square cursor-zoom-in overflow-hidden bg-[#0B0B0B]"
+            className="relative aspect-[4/3] cursor-zoom-in overflow-hidden bg-[#0B0B0B] sm:aspect-square"
           >
             <motion.div
               animate={{ scale: zoomed ? 1.35 : 1 }}
@@ -83,7 +83,7 @@ export default function ProductQuickView({ product, open, onOpenChange }: Props)
           </div>
 
           {/* details */}
-          <div className="flex flex-col p-6">
+          <div className="flex flex-col p-4 sm:p-6">
             <DialogHeader className="space-y-1 text-left">
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#BDBDBD]">
                 {product.brand} · {product.category_name}
@@ -127,7 +127,7 @@ export default function ProductQuickView({ product, open, onOpenChange }: Props)
                   data-testid={`quick-view-qty-minus-${product.id}`}
                   aria-label="Diminuir quantidade"
                   onClick={() => setQty((q) => Math.max(1, q - 1))}
-                  className="rounded-full p-1.5 text-white transition-colors hover:text-[#DAA520]"
+                  className="flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors hover:text-[#DAA520]"
                 >
                   <Minus className="h-3.5 w-3.5" />
                 </button>
@@ -139,13 +139,13 @@ export default function ProductQuickView({ product, open, onOpenChange }: Props)
                   data-testid={`quick-view-qty-plus-${product.id}`}
                   aria-label="Aumentar quantidade"
                   onClick={() => setQty((q) => Math.min(99, q + 1))}
-                  className="rounded-full p-1.5 text-white transition-colors hover:text-[#DAA520]"
+                  className="flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors hover:text-[#DAA520]"
                 >
                   <Plus className="h-3.5 w-3.5" />
                 </button>
               </div>
               <Badge variant="outline" className="text-xs">
-                {product.in_stock ? "DisponÃ­vel" : "Sem estoque"}
+                {product.in_stock ? "Disponível" : "Sem estoque"}
               </Badge>
             </div>
 

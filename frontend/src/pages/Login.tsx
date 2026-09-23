@@ -97,7 +97,7 @@ export default function Login() {
   };
 
   return (
-    <div data-testid="login-page" className="mx-auto grid min-h-[calc(100svh-8rem)] w-full max-w-7xl items-stretch gap-10 px-4 py-12 sm:px-8 lg:grid-cols-2">
+    <div data-testid="login-page" className="mx-auto grid min-h-[calc(100svh-8rem)] w-full max-w-7xl items-stretch gap-10 px-4 py-8 sm:px-8 sm:py-12 lg:grid-cols-2">
       {/* brand panel */}
       <div className="relative hidden overflow-hidden rounded-2xl border border-[#DAA520]/20 lg:block">
         <img
@@ -213,7 +213,7 @@ export default function Login() {
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
                       aria-label="Mostrar senha"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-[#BDBDBD] hover:text-[#DAA520]"
+                      className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-[#BDBDBD] hover:text-[#DAA520]"
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -224,7 +224,7 @@ export default function Login() {
                     type="button"
                     data-testid="forgot-password-link"
                     onClick={() => setForgotOpen(true)}
-                    className="text-xs font-semibold text-[#DAA520] hover:underline"
+                    className="flex min-h-11 items-center text-xs font-semibold text-[#DAA520] hover:underline"
                   >
                     Esqueci minha senha
                   </button>
@@ -258,6 +258,7 @@ export default function Login() {
                       data-testid="register-name-input"
                       value={regName}
                       required
+                      autoComplete="name"
                       onChange={(e) => setRegName(e.target.value)}
                       className="pl-9"
                       placeholder="Seu nome"
@@ -273,6 +274,7 @@ export default function Login() {
                       data-testid="register-email-input"
                       type="email"
                       required
+                      autoComplete="email"
                       value={regEmail}
                       onChange={(e) => setRegEmail(e.target.value)}
                       className="pl-9"
@@ -290,6 +292,7 @@ export default function Login() {
                       type={showPassword ? "text" : "password"}
                       required
                       minLength={15}
+                      autoComplete="new-password"
                       value={regPassword}
                       onChange={(e) => setRegPassword(e.target.value)}
                       className="pl-9"
@@ -343,6 +346,7 @@ export default function Login() {
                 data-testid="forgot-email-input"
                 type="email"
                 required
+                autoComplete="email"
                 value={forgotEmail}
                 onChange={(e) => setForgotEmail(e.target.value)}
                 placeholder="voce@email.com"

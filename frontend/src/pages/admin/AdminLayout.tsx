@@ -142,7 +142,7 @@ export default function AdminLayout() {
       </aside>
 
       {/* barra superior mobile com navegação horizontal */}
-      <div className="sticky top-0 z-40 border-b border-[#1F1F1F] bg-[#0D0D0D] lg:hidden">
+      <div className="sticky top-0 z-40 border-b border-[#1F1F1F] bg-[#0D0D0D] pt-[env(safe-area-inset-top)] lg:hidden">
         <div className="flex items-center justify-between px-4 py-3">
           <BrandBlock />
           <Button
@@ -166,7 +166,7 @@ export default function AdminLayout() {
               data-testid={`admin-nav-mobile-${item.key}`}
               className={({ isActive }) =>
                 cn(
-                  "flex min-h-10 shrink-0 items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors",
+                  "flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors",
                   isActive
                     ? "border-[#DAA520] bg-[#1E1A08] text-[#DAA520]"
                     : "border-[#242424] bg-[#151515] text-[#8E8E8E]",
@@ -180,8 +180,8 @@ export default function AdminLayout() {
         </nav>
       </div>
 
-      <main className="lg:pl-64">
-        <div className="mx-auto max-w-6xl p-4 sm:p-8">
+      <main className="min-w-0 lg:pl-64">
+        <div className="mx-auto min-w-0 max-w-6xl p-4 sm:p-8">
           <PageTransition>
             <Outlet />
           </PageTransition>

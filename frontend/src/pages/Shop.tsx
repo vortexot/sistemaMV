@@ -68,7 +68,7 @@ function CategoryCard({ name, slug, imageFileId }: { name: string; slug: string;
     <Link
       to={`/?cat=${slug}#colecao`}
       data-testid={`category-card-${slug}`}
-      className="group relative flex h-44 flex-col justify-end overflow-hidden rounded-xl border border-[#242424] bg-[#151515] transition-all duration-300 hover:-translate-y-1.5 hover:border-[#DAA520] hover:shadow-[0_12px_24px_rgba(255,210,28,0.1)]"
+      className="group relative flex h-36 flex-col justify-end overflow-hidden rounded-xl border border-[#242424] bg-[#151515] transition-all duration-300 hover:-translate-y-1.5 hover:border-[#DAA520] hover:shadow-[0_12px_24px_rgba(255,210,28,0.1)] sm:h-44"
     >
       {imageFileId && (
         <img
@@ -82,8 +82,8 @@ function CategoryCard({ name, slug, imageFileId }: { name: string; slug: string;
         />
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0B] via-[#0B0B0B]/40 to-transparent" />
-      <div className="relative z-10 flex items-center justify-between p-5">
-        <h3 className="font-heading text-lg font-extrabold uppercase tracking-wide text-white transition-colors group-hover:text-[#DAA520]">
+      <div className="relative z-10 flex items-center justify-between gap-2 p-3 sm:p-5">
+        <h3 className="min-w-0 font-heading text-sm font-extrabold uppercase leading-tight tracking-wide text-white transition-colors group-hover:text-[#DAA520] sm:text-base lg:text-lg">
           {name}
         </h3>
         <ArrowRight className="h-4 w-4 text-[#DAA520] transition-transform duration-300 group-hover:translate-x-1" />
@@ -99,7 +99,7 @@ function SectionHeader({ eyebrow, title, testId, id }: { eyebrow: string; title:
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.5, ease: "easeOut" }}
-      className="mb-8"
+      className="mb-6 sm:mb-8"
     >
       <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#DAA520]">{eyebrow}</p>
       <h2
@@ -252,7 +252,7 @@ export default function Shop() {
             </Link>
             <Link
               to="/#colecao"
-              className="text-sm font-semibold uppercase tracking-wider text-white underline-offset-8 transition-colors hover:text-[#DAA520] hover:underline"
+              className="flex min-h-11 items-center text-sm font-semibold uppercase tracking-wider text-white underline-offset-8 transition-colors hover:text-[#DAA520] hover:underline"
             >
               Ver coleção completa
             </Link>
@@ -286,7 +286,7 @@ export default function Shop() {
       </div>
 
       {/* ---------------------------------------------------------- categorias */}
-      <section id="categorias" className="render-section mx-auto w-full max-w-7xl scroll-mt-24 px-4 py-16 sm:px-8">
+      <section id="categorias" className="render-section mx-auto w-full max-w-7xl scroll-mt-24 px-4 py-12 sm:px-8 sm:py-16">
         <SectionHeader eyebrow="Explore por estilo" title="Categorias" testId="shop-categories-title" />
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6 lg:grid-cols-6">
           {categories.map((cat, index) => (
@@ -304,11 +304,11 @@ export default function Shop() {
       </section>
 
       {/* ---------------------------------------------------------- destaques */}
-      <section id="destaques" className="render-section scroll-mt-24 border-y border-[#242424] bg-[#151515]/40 py-20">
+      <section id="destaques" className="render-section scroll-mt-24 border-y border-[#242424] bg-[#151515]/40 py-14 sm:py-20">
         <div className="mx-auto w-full max-w-7xl px-4 sm:px-8">
           <SectionHeader eyebrow="Seleção Golden" title="Destaques" testId="shop-featured-title" />
           {productsQuery.isLoading ? (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-5 min-[420px]:grid-cols-2 sm:gap-6 lg:grid-cols-4">
               {[0, 1, 2, 3].map((i) => (
                 <ProductSkeleton key={i} />
               ))}
@@ -333,7 +333,7 @@ export default function Shop() {
               description="Os produtos marcados como destaque pelo administrador aparecem nesta seção."
             />
           ) : (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-5 min-[420px]:grid-cols-2 sm:gap-6 lg:grid-cols-4">
               {destaques.map((product, index) => (
                 <ProductCard key={product.id} product={product} index={index} />
               ))}
@@ -343,7 +343,7 @@ export default function Shop() {
       </section>
 
       {/* ---------------------------------------------------------- coleção */}
-      <section id="colecao" className="render-section mx-auto w-full max-w-7xl scroll-mt-24 px-4 py-20 sm:px-8">
+      <section id="colecao" className="render-section mx-auto w-full max-w-7xl scroll-mt-24 px-4 py-14 sm:px-8 sm:py-20">
         <div className="flex flex-wrap items-end justify-between gap-6">
           <SectionHeader eyebrow="Toda a vitrine" title="Coleção" testId="shop-catalog-title" />
           <div className="mb-8 flex flex-wrap items-center gap-2" data-testid="shop-category-filter">
@@ -351,7 +351,7 @@ export default function Shop() {
               type="button"
               data-testid="shop-filter-all"
               onClick={() => applyFilters({ cat: "" })}
-              className={`min-h-10 rounded-full border px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors ${
+              className={`min-h-11 rounded-full border px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors ${
                 activeCategory === ""
                   ? "border-[#DAA520] bg-[#DAA520] text-[#0B0B0B]"
                   : "border-[#242424] bg-[#151515] text-[#BDBDBD] hover:border-[#DAA520] hover:text-[#DAA520]"
@@ -365,7 +365,7 @@ export default function Shop() {
                 type="button"
                 data-testid={`shop-filter-${cat.slug}`}
                 onClick={() => applyFilters({ cat: cat.slug })}
-                className={`min-h-10 rounded-full border px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors ${
+                className={`min-h-11 rounded-full border px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors ${
                   activeCategory === cat.slug
                     ? "border-[#DAA520] bg-[#DAA520] text-[#0B0B0B]"
                     : "border-[#242424] bg-[#151515] text-[#BDBDBD] hover:border-[#DAA520] hover:text-[#DAA520]"
@@ -406,7 +406,7 @@ export default function Shop() {
                 setDraft("");
                 applyFilters({ q: "" });
               }}
-              className="absolute right-[5.5rem] top-1/2 -translate-y-1/2 rounded p-1 text-[#BDBDBD] transition-colors hover:text-[#DAA520]"
+              className="absolute right-[5.5rem] top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-[#BDBDBD] transition-colors hover:text-[#DAA520]"
             >
               <X className="h-4 w-4" />
             </button>
@@ -414,7 +414,7 @@ export default function Shop() {
           <button
             type="submit"
             data-testid="catalog-search-submit"
-            className="absolute right-1.5 top-1.5 h-9 rounded-lg bg-[#DAA520] px-4 text-xs font-bold uppercase tracking-wide text-[#0B0B0B] transition-colors hover:bg-[#A07C1B]"
+            className="absolute right-1 top-1 h-10 rounded-lg bg-[#DAA520] px-4 text-xs font-bold uppercase tracking-wide text-[#0B0B0B] transition-colors hover:bg-[#A07C1B]"
           >
             Buscar
           </button>
@@ -461,7 +461,7 @@ export default function Shop() {
         )}
 
         {productsQuery.isLoading ? (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-5 min-[420px]:grid-cols-2 sm:gap-6 lg:grid-cols-4">
             {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
               <ProductSkeleton key={i} />
             ))}
@@ -501,7 +501,7 @@ export default function Shop() {
             }
           />
         ) : (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-5 min-[420px]:grid-cols-2 sm:gap-6 lg:grid-cols-4">
             {filtered.map((product, index) => (
               <ProductCard key={product.id} product={product} index={index} />
             ))}
@@ -509,7 +509,7 @@ export default function Shop() {
         )}
       </section>
 
-      <section aria-labelledby="faq-title" className="render-section border-t border-[#242424] bg-[#0B0B0B] py-20">
+      <section aria-labelledby="faq-title" className="render-section border-t border-[#242424] bg-[#0B0B0B] py-14 sm:py-20">
         <div className="mx-auto max-w-4xl px-4 sm:px-8">
           <SectionHeader eyebrow="Dúvidas frequentes" title="Como funciona a compra" testId="faq-title" id="faq-title" />
           <div className="divide-y divide-[#242424] rounded-2xl border border-[#242424] bg-[#151515]">
@@ -529,7 +529,7 @@ export default function Shop() {
       <CustomerStories stories={CUSTOMER_STORIES} />
 
       {/* ---------------------------------------------------------- manifesto */}
-      <section className="render-section border-t border-[#242424] bg-[#151515]/40 py-20">
+      <section className="render-section border-t border-[#242424] bg-[#151515]/40 py-14 sm:py-20">
         <div className="mx-auto grid max-w-7xl items-center gap-10 px-4 sm:px-8 lg:grid-cols-2">
           <motion.div
             initial={{ opacity: 0, x: -24 }}

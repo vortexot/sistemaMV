@@ -35,7 +35,7 @@ export default function BrandMark({
         )}
       />
       {showWordmark && (
-        <span className="flex flex-col leading-none">
+        <span data-slot="brand-wordmark" className="flex flex-col leading-none">
           <span
             className={cn(
               "font-heading font-extrabold uppercase tracking-[0.22em] text-white",

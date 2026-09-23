@@ -12,7 +12,7 @@ export default function CartPage() {
   const { subtotal, descontos, total } = cartTotals(items);
 
   return (
-    <div data-testid="cart-page" className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-8">
+    <div data-testid="cart-page" className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-8 sm:py-12">
       <nav aria-label="Navegação estrutural" className="mb-5 text-xs text-[#BDBDBD]">
         <Link to="/" className="hover:text-[#DAA520]">Loja</Link>
         <span aria-hidden="true" className="px-2">/</span>
@@ -47,8 +47,8 @@ export default function CartPage() {
           />
         </div>
       ) : (
-        <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_360px]">
-          <div className="space-y-4">
+        <div className="mt-8 grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="min-w-0 space-y-4">
             {items.map((item) => (
               <motion.div
                 key={item.product_id}
@@ -56,11 +56,11 @@ export default function CartPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, ease: "easeOut" }}
                 data-testid={`cart-item-${item.product_id}`}
-                className="flex gap-4 rounded-xl border border-[#242424] bg-[#151515] p-4"
+                className="min-w-0 gap-4 rounded-xl border border-[#242424] bg-[#151515] p-4 min-[360px]:flex"
               >
                 <Link
                   to="/"
-                  className="h-24 w-20 shrink-0 overflow-hidden rounded-lg border border-[#242424]"
+                  className="mb-3 block h-32 w-full shrink-0 overflow-hidden rounded-lg border border-[#242424] min-[360px]:mb-0 min-[360px]:h-24 min-[360px]:w-20"
                 >
                   <ProductImage fileId={item.image_file_id} name={item.name} />
                 </Link>
@@ -78,7 +78,7 @@ export default function CartPage() {
                       data-testid={`cart-remove-${item.product_id}`}
                       onClick={() => remove(item.product_id)}
                       aria-label={`Remover ${item.name}`}
-                      className="rounded-lg p-2 text-[#BDBDBD] transition-colors hover:bg-[#242424] hover:text-[#DC2626]"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[#BDBDBD] transition-colors hover:bg-[#242424] hover:text-[#DC2626]"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -90,7 +90,7 @@ export default function CartPage() {
                         data-testid={`cart-qty-minus-${item.product_id}`}
                         onClick={() => setQty(item.product_id, item.qty - 1)}
                         aria-label="Diminuir quantidade"
-                        className="rounded-full p-1.5 text-white transition-colors hover:text-[#DAA520]"
+                        className="flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors hover:text-[#DAA520]"
                       >
                         <Minus className="h-3.5 w-3.5" />
                       </button>
@@ -102,7 +102,7 @@ export default function CartPage() {
                         data-testid={`cart-qty-plus-${item.product_id}`}
                         onClick={() => setQty(item.product_id, item.qty + 1)}
                         aria-label="Aumentar quantidade"
-                        className="rounded-full p-1.5 text-white transition-colors hover:text-[#DAA520]"
+                        className="flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors hover:text-[#DAA520]"
                       >
                         <Plus className="h-3.5 w-3.5" />
                       </button>
@@ -129,7 +129,7 @@ export default function CartPage() {
             ))}
           </div>
 
-          <aside className="h-fit rounded-xl border border-[#242424] bg-[#151515] p-6 lg:sticky lg:top-24">
+          <aside className="h-fit min-w-0 rounded-xl border border-[#242424] bg-[#151515] p-5 sm:p-6 lg:sticky lg:top-24">
             <h2 className="font-heading text-xl font-bold text-white">Resumo do pedido</h2>
             <div className="mt-5 space-y-3 text-sm">
               <div className="flex justify-between text-[#BDBDBD]">

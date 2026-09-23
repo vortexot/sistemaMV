@@ -52,7 +52,7 @@ export default function Header() {
         onChange={(e) => setTerm(e.target.value)}
         placeholder="Buscar peças, marcas…"
         aria-label="Buscar peças"
-        className="h-10 w-full rounded-lg border border-[#242424] bg-[#151515] pl-9 pr-20 text-sm text-white placeholder:text-[#BDBDBD]/70 transition-colors focus:border-[#DAA520] focus:outline-none"
+        className="h-12 w-full rounded-lg border border-[#242424] bg-[#151515] pl-10 pr-24 text-base text-white placeholder:text-[#BDBDBD]/70 transition-colors focus:border-[#DAA520] focus:outline-none md:text-sm"
       />
       {term && (
         <button
@@ -63,7 +63,7 @@ export default function Header() {
             setTerm("");
             navigate("/#colecao");
           }}
-          className="absolute right-[4.25rem] top-1/2 -translate-y-1/2 rounded p-1 text-[#BDBDBD] transition-colors hover:text-[#DAA520]"
+          className="absolute right-[5.25rem] top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-lg text-[#BDBDBD] transition-colors hover:text-[#DAA520]"
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -71,7 +71,7 @@ export default function Header() {
       <button
         type="submit"
         data-testid={`${testId}-submit`}
-        className="absolute right-1 top-1 h-8 rounded-md bg-[#DAA520] px-3 text-xs font-bold uppercase tracking-wide text-[#0B0B0B] transition-colors hover:bg-[#A07C1B]"
+        className="absolute right-1 top-1 h-10 rounded-md bg-[#DAA520] px-3 text-xs font-bold uppercase tracking-wide text-[#0B0B0B] transition-colors hover:bg-[#A07C1B]"
       >
         Buscar
       </button>
@@ -83,7 +83,7 @@ export default function Header() {
       to="/carrinho"
       data-testid="shop-cart-link"
       aria-label="Abrir carrinho"
-      className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-[#242424] bg-[#151515] text-white transition-colors hover:border-[#DAA520] hover:text-[#DAA520]"
+      className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#242424] bg-[#151515] text-white transition-colors hover:border-[#DAA520] hover:text-[#DAA520]"
     >
       <ShoppingBag className="h-5 w-5" />
       {count > 0 && (
@@ -116,7 +116,7 @@ export default function Header() {
     <Link
       to="/login"
       data-testid="header-login-link"
-      className="flex h-10 items-center gap-2 rounded-lg bg-[#DAA520] px-4 text-sm font-bold uppercase tracking-wide text-[#0B0B0B] transition-colors hover:bg-[#A07C1B]"
+      className="flex h-11 items-center gap-2 rounded-lg bg-[#DAA520] px-4 text-sm font-bold uppercase tracking-wide text-[#0B0B0B] transition-colors hover:bg-[#A07C1B]"
     >
       <LogIn className="h-4 w-4" /> Entrar
     </Link>
@@ -125,10 +125,10 @@ export default function Header() {
   return (
     <header
       data-testid="shop-header"
-      className="fixed inset-x-0 top-0 z-50 border-b border-[#242424] bg-[#0B0B0B]/98 shadow-[0_1px_0_rgba(255,255,255,0.02)]"
+      className="fixed inset-x-0 top-0 z-50 border-b border-[#242424] bg-[#0B0B0B]/98 pt-[env(safe-area-inset-top)] shadow-[0_1px_0_rgba(255,255,255,0.02)]"
     >
       <div className="mx-auto flex h-20 max-w-7xl items-center gap-4 px-4 sm:px-8">
-        <BrandMark testId="header-logo" />
+        <BrandMark testId="header-logo" className="shrink-0 max-[359px]:gap-0 max-[359px]:[&_[data-slot=brand-wordmark]]:hidden" />
 
         <nav className="ml-2 hidden items-center gap-7 xl:flex" data-testid="header-nav-desktop">
           {NAV_LINKS.map((link) => (
@@ -143,35 +143,35 @@ export default function Header() {
         </nav>
 
         {/* busca — sempre visível a partir de md */}
-        <div className="mx-auto hidden w-full max-w-sm md:block">
+        <div className="mx-auto hidden min-w-0 w-full max-w-sm md:block">
           {searchField("header-search", "shop-search-input")}
         </div>
 
-        <div className="ml-auto flex items-center gap-2 md:ml-0 sm:gap-3">
+        <div className="ml-auto flex min-w-0 items-center gap-1.5 md:ml-0 sm:gap-3">
           <button
             type="button"
             data-testid="shop-search-toggle"
             aria-label="Buscar peças"
             onClick={() => setMobileSearchOpen((v) => !v)}
-            className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#242424] bg-[#151515] text-white transition-colors hover:border-[#DAA520] hover:text-[#DAA520] md:hidden"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#242424] bg-[#151515] text-white transition-colors hover:border-[#DAA520] hover:text-[#DAA520] md:hidden"
           >
             <Search className="h-5 w-5" />
           </button>
           {cartBadge}
-          <div className="hidden sm:block">{accountLink}</div>
+          <div className="hidden lg:block">{accountLink}</div>
           <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
             <SheetTrigger
               render={
                 <button
                   aria-label="Abrir menu"
                   data-testid="header-mobile-menu"
-                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#242424] bg-[#151515] text-white xl:hidden"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#242424] bg-[#151515] text-white xl:hidden"
                 >
                   <Menu className="h-5 w-5" />
                 </button>
               }
             />
-            <SheetContent side="right" className="w-72 border-[#242424] bg-[#0B0B0B] p-6">
+            <SheetContent side="right" className="border-[#242424] bg-[#0B0B0B] px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))]">
               <SheetTitle className="font-heading text-lg font-extrabold uppercase tracking-[0.2em] text-white">
                 Menu
               </SheetTitle>
@@ -182,7 +182,7 @@ export default function Header() {
                     key={link.to}
                     to={link.to}
                     onClick={() => setMenuOpen(false)}
-                    className="rounded-lg px-3 py-2.5 text-sm font-semibold uppercase tracking-wider text-[#BDBDBD] transition-colors hover:bg-[#151515] hover:text-[#DAA520]"
+                    className="flex min-h-11 items-center rounded-lg px-3 py-2.5 text-sm font-semibold uppercase tracking-wider text-[#BDBDBD] transition-colors hover:bg-[#151515] hover:text-[#DAA520]"
                   >
                     {link.label}
                   </Link>
@@ -220,7 +220,6 @@ export default function Header() {
               </div>
             </SheetContent>
           </Sheet>
-          <div className="sm:hidden">{accountLink}</div>
         </div>
       </div>
 

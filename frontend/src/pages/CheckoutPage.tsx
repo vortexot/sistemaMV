@@ -140,7 +140,7 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div data-testid="checkout-page" className="mx-auto w-full max-w-7xl px-4 py-12 pb-28 sm:px-8 lg:pb-12">
+    <div data-testid="checkout-page" className="mx-auto w-full max-w-7xl px-4 py-8 pb-[calc(7rem+env(safe-area-inset-bottom))] sm:px-8 sm:py-12 lg:pb-12">
       <nav aria-label="Navegação estrutural" className="mb-5 text-xs text-[#BDBDBD]">
         <Link to="/" className="hover:text-[#DAA520]">Loja</Link>
         <span aria-hidden="true" className="px-2">/</span>
@@ -153,7 +153,7 @@ export default function CheckoutPage() {
       </h1>
       <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_400px]">
         {/* resumo */}
-        <section className="rounded-xl border border-[#242424] bg-[#151515] p-6">
+        <section className="min-w-0 rounded-xl border border-[#242424] bg-[#151515] p-5 sm:p-6">
           <h2 className="font-heading text-xl font-bold text-white">Resumo do pedido</h2>
           <div className="mt-5 space-y-4">
             {items.map((item) => (
@@ -207,8 +207,8 @@ export default function CheckoutPage() {
         </section>
 
         {/* pagamento */}
-        <aside className="h-fit space-y-4 lg:sticky lg:top-24">
-          <div className="rounded-xl border border-[#DAA520]/30 bg-[#1E1A08]/50 p-6">
+        <aside className="h-fit min-w-0 space-y-4 lg:sticky lg:top-24">
+          <div className="min-w-0 rounded-xl border border-[#DAA520]/30 bg-[#1E1A08]/50 p-5 sm:p-6">
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#DAA520]/15">
                 <ShieldCheck className="h-5 w-5 text-[#DAA520]" />
@@ -294,7 +294,7 @@ export default function CheckoutPage() {
         </aside>
       </div>
       {paypalConfigured && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#DAA520]/30 bg-[#0B0B0B] p-3 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] lg:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#DAA520]/30 bg-[#0B0B0B] px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] lg:hidden">
           <Button
             type="button"
             disabled={paypalFlow.isPending}

@@ -6,7 +6,10 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full overflow-x-auto"
+      role="region"
+      aria-label="Tabela com rolagem horizontal"
+      tabIndex={0}
+      className="relative w-full overflow-x-auto overscroll-x-contain focus-visible:ring-2 focus-visible:ring-[#DAA520] focus-visible:outline-none"
     >
       <table
         data-slot="table"
