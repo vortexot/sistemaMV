@@ -186,12 +186,12 @@ async def test_logout_revokes_bearer_sessions_too(secure):
     assert (await secure.api.get('/api/auth/me', headers=copied)).status_code == 401
 
 
-async def test_login_rate_pair_does_not_lock_other_source(secure):
+async def test_login_failure_limit_does_not_lock_valid_credentials(secure):
     for _ in range(10):
         assert (await secure.api.post('/api/auth/login', json={'email': 'admin@example.com', 'password': 'wrong'})).status_code == 401
     assert (await secure.api.post('/api/auth/login', json={'email': 'admin@example.com', 'password': 'wrong'})).status_code == 429
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app, client=('127.0.0.2', 4321)), base_url='https://shop.test') as other:
-        assert (await other.post('/api/auth/login', json={'email': 'admin@example.com', 'password': 'wrong'})).status_code == 401
+        assert (await other.post('/api/auth/login', json={'email': 'admin@example.com', 'password': PASSWORD})).status_code == 200
 
 
 async def test_forwarding_headers_do_not_bypass_rate_limit(secure):
@@ -213,6 +213,7 @@ async def test_forwarding_headers_do_not_bypass_rate_limit(secure):
 
 async def test_retired_google_routes_are_not_exposed(secure):
     assert not security.verify_password('test', None)
+    assert (await secure.api.get('/openapi.json')).status_code == 404
     assert (await secure.api.get('/api/auth/options')).status_code == 404
     assert (await secure.api.post('/api/auth/google/session', json={'session_id': 'fake'})).status_code == 404
 

@@ -104,6 +104,26 @@ async def _rate_limit(request: Request, action: str, email: str = '', maximum: i
             raise HTTPException(429, 'Muitas tentativas. Aguarde alguns minutos.')
 
 
+async def _rate_limit_login_failure(email: str, maximum: int = 10) -> None:
+    """Bound credential guesses without locking out a valid login.
+
+    The key excludes proxy headers: changing the apparent source address does
+    not change the account being guessed. This runs only after a failed secret,
+    so correct credentials continue to work during an attack.
+    """
+    window = int(utcnow().timestamp()) // 900
+    key = hashlib.sha256(f'login-failure:subject:{email}:{window}'.encode()).hexdigest()
+    row = await db.auth_limits.find_one_and_update(
+        {'_id': key},
+        {'$inc': {'count': 1}, '$setOnInsert': {'expires_at': utcnow() + timedelta(minutes=30)}},
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
+    )
+    if row['count'] > maximum:
+        audit_event('LOGIN_FAILURE', target_id=subject_hash(email), outcome='rate_limited', alert=True)
+        raise HTTPException(429, 'Muitas tentativas. Aguarde alguns minutos.')
+
+
 @router.post("/register", response_model=UserPublic)
 async def register(input: RegisterIn, request: Request, response: Response) -> UserPublic:
     email = input.email.lower().strip()
@@ -131,16 +151,18 @@ async def register(input: RegisterIn, request: Request, response: Response) -> U
 @router.post("/login", response_model=UserPublic)
 async def login(input: LoginIn, request: Request, response: Response) -> UserPublic:
     email = input.email.lower().strip()
-    await _rate_limit(request, 'login', email)
+    await _rate_limit(request, 'login-source', maximum=50)
     user = await db.users.find_one({"email": email}, {"_id": 0})
     valid = verify_password(input.password, user.get('password_hash') if user else DUMMY_HASH)
     if not user or not valid or user.get('status') != 'ativo':
+        await _rate_limit_login_failure(email)
         audit_event('LOGIN_FAILURE', target_id=subject_hash(email), outcome='invalid_credentials')
         raise HTTPException(status_code=401, detail="E-mail ou senha inválidos.")
     mfa_verified = False
     if user.get('mfa_enabled'):
         mfa_verified = await verify_second_factor(user, input.mfa_code)
         if not mfa_verified:
+            await _rate_limit_login_failure(email)
             audit_event('LOGIN_FAILURE', target_id=user['id'], outcome='invalid_second_factor')
             raise HTTPException(status_code=401, detail="Código do autenticador ou de recuperação inválido.")
     elif user.get('role') in {'admin', 'atendente'} and os.getenv('MFA_REQUIRED') == 'true':

@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI):
 
 
 # Create the main app without a prefix
-app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None)
+app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
