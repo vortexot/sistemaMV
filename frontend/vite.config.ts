@@ -13,6 +13,7 @@ const visualEditsDisabled = process.env.DISABLE_VISUAL_EDITS !== "false";
 
 // Branded error overlay (build + runtime errors); escape hatch mirrors the two above.
 const emergentOverlayDisabled = process.env.DISABLE_EMERGENT_OVERLAY !== "false";
+const apiProxyTarget = process.env.VITE_PROXY_TARGET?.trim() || "http://localhost:8001";
 
 // Fails open: a broken overlay package must degrade to "no overlay" (Vite's own overlay
 // takes over), never to "no dev server". Never let a preview aid take the app down.
@@ -113,7 +114,7 @@ export default defineConfig(async () => {
       // absolute backend URL. Target is the FastAPI dev server (supervisor: backend).
       proxy: {
         "/api": {
-          target: "http://localhost:8001",
+          target: apiProxyTarget,
           changeOrigin: true,
         },
       },
