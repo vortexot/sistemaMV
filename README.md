@@ -8,7 +8,7 @@ painel administrativo e apresentação de mídia para a loja física.
 - `frontend/`: Vite, React 19, TypeScript e Tailwind CSS.
 - `backend/`: FastAPI, MongoDB e armazenamento de imagens em volume persistente.
 - `tests/`: testes de navegador com Playwright.
-- `vercel.ts`: build do frontend, cabeçalhos HTTP, fallback da SPA e proxy `/api`.
+- `frontend/vercel.ts`: build do frontend, cabeçalhos HTTP, fallback da SPA e proxy `/api`.
 
 O frontend usa o prefixo relativo `/api`. Em desenvolvimento, o Vite encaminha
 esse prefixo para o FastAPI. Na Vercel, o mesmo prefixo é encaminhado para a
@@ -65,7 +65,7 @@ em outra hospedagem HTTPS com MongoDB e armazenamento persistentes. Configure:
 - `VITE_GA_MEASUREMENT_ID`: opcional; deixe vazio para não carregar Analytics.
 - dados públicos opcionais `VITE_BUSINESS_*` descritos em `frontend/.env.example`.
 
-`vercel.ts` bloqueia a configuração quando `BACKEND_ORIGIN` está ausente ou não é
+`frontend/vercel.ts` bloqueia a configuração quando `BACKEND_ORIGIN` está ausente ou não é
 uma origem HTTPS válida. O backend, o MongoDB e uploads não são executados na
 Vercel por esta configuração. O armazenamento local efêmero de funções serverless
 não atende aos uploads deste sistema.

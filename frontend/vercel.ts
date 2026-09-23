@@ -21,9 +21,9 @@ if (
 export default {
   $schema: "https://openapi.vercel.sh/vercel.json",
   framework: "vite",
-  installCommand: "npm --prefix frontend ci --no-audit --no-fund",
-  buildCommand: "npm --prefix frontend run build",
-  outputDirectory: "frontend/dist",
+  installCommand: "npm ci --no-audit --no-fund",
+  buildCommand: "npm run build",
+  outputDirectory: "dist",
   cleanUrls: true,
   trailingSlash: false,
   rewrites: [

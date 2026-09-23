@@ -1,14 +1,19 @@
 """Provision the first synthetic staging administrator with MFA enabled.
 
 Run this only from a trusted one-off shell connected to the staging MongoDB.
-The TOTP seed and recovery codes are printed once and must never be pasted into
-chat, committed, or copied to provider logs.
+The TOTP seed and recovery codes are either printed once in interactive mode or
+written once to an explicitly requested local file. They must never be pasted
+into chat, committed, or copied to provider logs.
 """
 
 import asyncio
+import argparse
 import getpass
+import json
 import os
 import re
+import secrets
+import string
 import sys
 import uuid
 from pathlib import Path
@@ -43,52 +48,94 @@ def _prompt() -> tuple[str, str, str]:
     return email, name, password
 
 
-async def provision() -> None:
+def _generated_credentials() -> tuple[str, str, str]:
+    alphabet = string.ascii_letters + string.digits
+    password = "".join(secrets.choice(alphabet) for _ in range(24))
+    return "admin.staging@mv.example", "Administrador Staging", password
+
+
+def _write_credentials(path: Path, email: str, password: str, secret: str, recovery_codes: list[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("x", encoding="utf-8") as output:
+        json.dump(
+            {
+                "email": email,
+                "password": password,
+                "totp_secret": secret,
+                "provisioning_uri": provisioning_uri(secret, email),
+                "recovery_codes": recovery_codes,
+            },
+            output,
+            indent=2,
+        )
+    os.chmod(path, 0o600)
+
+
+async def provision(generated_output: Path | None = None) -> None:
     if os.getenv("APP_ENV") != "staging":
         raise SystemExit("Refusing to run unless APP_ENV=staging.")
     if os.getenv("PAYMENTS_PAUSED", "true") != "true":
         raise SystemExit("Refusing to run while staging payments are unpaused.")
 
     validate_production_config()
-    email, name, password = _prompt()
+    email, name, password = _generated_credentials() if generated_output else _prompt()
     await ensure_indexes()
     if await db.users.find_one({"email": email}, {"_id": 1}):
         raise SystemExit("A user with that email already exists; nothing changed.")
 
     user_id = str(uuid.uuid4())
     secret = new_secret()
-    print("\nAdd this staging-only TOTP account to your authenticator:")
-    print(provisioning_uri(secret, email))
-    print("Do not paste this URI or its secret into chat or provider logs.\n")
-    code = input("Current authenticator code: ").strip()
-    if not pyotp.TOTP(secret).verify(code, valid_window=0):
-        raise SystemExit("Invalid TOTP code; nothing changed.")
-
     recovery_codes = new_recovery_codes()
-    await db.users.insert_one(
-        {
-            "id": user_id,
-            "name": name,
-            "email": email,
-            "password_hash": hash_password(password),
-            "role": "admin",
-            "status": "ativo",
-            "picture": None,
-            "token_version": 0,
-            "mfa_enabled": True,
-            "mfa_secret": encrypt_secret(secret),
-            "mfa_recovery_codes": [recovery_digest(user_id, item) for item in recovery_codes],
-            "created_at": utcnow(),
-        }
-    )
-    print("\nAdministrator created. Store these one-use recovery codes securely now:")
-    for item in recovery_codes:
-        print(item)
-    print("\nThey cannot be displayed again. Do not paste them into chat or provider logs.")
+    if generated_output:
+        _write_credentials(generated_output, email, password, secret, recovery_codes)
+    else:
+        print("\nAdd this staging-only TOTP account to your authenticator:")
+        print(provisioning_uri(secret, email))
+        print("Do not paste this URI or its secret into chat or provider logs.\n")
+        code = input("Current authenticator code: ").strip()
+        if not pyotp.TOTP(secret).verify(code, valid_window=0):
+            raise SystemExit("Invalid TOTP code; nothing changed.")
+
+    try:
+        await db.users.insert_one(
+            {
+                "id": user_id,
+                "name": name,
+                "email": email,
+                "password_hash": hash_password(password),
+                "role": "admin",
+                "status": "ativo",
+                "picture": None,
+                "token_version": 0,
+                "mfa_enabled": True,
+                "mfa_secret": encrypt_secret(secret),
+                "mfa_recovery_codes": [recovery_digest(user_id, item) for item in recovery_codes],
+                "created_at": utcnow(),
+            }
+        )
+    except BaseException:
+        if generated_output:
+            generated_output.unlink(missing_ok=True)
+        raise
+
+    if generated_output:
+        print("Administrator created; credentials were written to the requested local file.")
+    else:
+        print("\nAdministrator created. Store these one-use recovery codes securely now:")
+        for item in recovery_codes:
+            print(item)
+        print("\nThey cannot be displayed again. Do not paste them into chat or provider logs.")
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--generate-credentials",
+        type=Path,
+        metavar="LOCAL_FILE",
+        help="generate a synthetic admin and write its credentials once to a new local file",
+    )
     try:
-        asyncio.run(provision())
+        asyncio.run(provision(parser.parse_args().generate_credentials))
     finally:
         client.close()

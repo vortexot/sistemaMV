@@ -13,7 +13,6 @@ services:
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     healthCheckPath: /api/
-    maxShutdownDelaySeconds: 30
     disk:
       name: staging-uploads
       mountPath: /data
