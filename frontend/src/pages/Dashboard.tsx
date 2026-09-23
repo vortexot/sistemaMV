@@ -62,8 +62,12 @@ export default function Dashboard() {
   if (!user) return <Navigate to="/login" replace />;
 
   const handleLogout = async () => {
-    await endSession();
-    navigate("/login");
+    try {
+      await endSession();
+      navigate("/login");
+    } catch {
+      toast.error("Não foi possível encerrar a sessão. Verifique sua conexão e tente novamente.");
+    }
   };
 
   const orders = ordersQuery.data ?? [];
@@ -139,6 +143,13 @@ export default function Dashboard() {
               className={`${buttonVariants({ variant: "outline" })} w-full justify-start gap-2`}
             >
               <ShoppingBag className="h-4 w-4 text-[#DAA520]" /> Abrir carrinho
+            </Link>
+            <Link
+              to="/seguranca"
+              data-testid="dashboard-security-link"
+              className={`${buttonVariants({ variant: "outline" })} w-full justify-start gap-2`}
+            >
+              <UserRound className="h-4 w-4 text-[#DAA520]" /> Segurança da conta
             </Link>
             <Link
               to="/"

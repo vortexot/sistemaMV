@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { CartProvider } from "@/lib/cart";
 import PublicLayout from "@/components/layout/PublicLayout";
@@ -11,8 +11,8 @@ const CartPage = lazy(() => import("@/pages/CartPage"));
 const CheckoutPage = lazy(() => import("@/pages/CheckoutPage"));
 const OrderConfirmation = lazy(() => import("@/pages/OrderConfirmation"));
 const Login = lazy(() => import("@/pages/Login"));
-const AuthCallback = lazy(() => import("@/pages/AuthCallback"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const AccountSecurity = lazy(() => import("@/pages/AccountSecurity"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const AdminRoutes = lazy(() => import("@/admin/AdminRoutes"));
 
@@ -21,12 +21,6 @@ function RouteFallback() {
 }
 
 function AppShell() {
-  const location = useLocation();
-  // Google (Emergent) OAuth lands on any route with #session_id=... — the callback
-  // must process the fragment BEFORE any session check runs.
-  if (location.hash.includes("session_id=")) {
-    return <Suspense fallback={<RouteFallback />}><AuthCallback /></Suspense>;
-  }
   return (
     <Suspense fallback={<RouteFallback />}>
         <Routes>
@@ -38,6 +32,7 @@ function AppShell() {
             <Route path="/pedido-confirmado" element={<OrderConfirmation />} />
             <Route path="/login" element={<Login />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/seguranca" element={<AccountSecurity />} />
           </Route>
           <Route path="/admin/*" element={<AdminRoutes />} />
           <Route path="*" element={<NotFound />} />

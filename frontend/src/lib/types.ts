@@ -8,6 +8,7 @@ export interface User {
   role: Role;
   status: string;
   picture: string | null;
+  mfa_enabled: boolean;
   created_at: string;
 }
 

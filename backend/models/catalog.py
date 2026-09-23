@@ -115,19 +115,28 @@ class CatalogCategory(BaseModel):
 
 
 class CategoryCreate(BaseModel):
+    model_config = ConfigDict(extra='forbid')
     name: str = Field(min_length=2, max_length=80)
-    description: str = ""
-    order: int = 0
+    description: str = Field(default="", max_length=500)
+    order: int = Field(default=0, ge=0, le=100000)
     active: bool = True
     image_file_id: str | None = None
 
 
 class CategoryUpdate(BaseModel):
-    name: str | None = None
-    description: str | None = None
-    order: int | None = None
+    model_config = ConfigDict(extra='forbid')
+    name: str | None = Field(default=None, min_length=2, max_length=80)
+    description: str | None = Field(default=None, max_length=500)
+    order: int | None = Field(default=None, ge=0, le=100000)
     active: bool | None = None
     image_file_id: str | None = None
+
+    @field_validator("name", "description", "order", "active")
+    @classmethod
+    def not_null(cls, value):
+        if value is None:
+            raise ValueError("Este campo não pode ser nulo.")
+        return value
 
 
 class Banner(BaseModel):

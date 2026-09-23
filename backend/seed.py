@@ -1,8 +1,10 @@
-"""Seed MV Multimarcas with demo catalog, banners and staff accounts. Idempotent.
+"""Synthetic catalog bootstrap. Idempotent and always disabled in production.
 
-Run: cd /app/backend && python seed.py
+Development: ``python seed.py``
+Staging: ``python seed.py --staging-synthetic``
 """
 
+import argparse
 import asyncio
 import os
 import uuid
@@ -93,6 +95,7 @@ async def save_seed_image(key: str, url: str) -> str | None:
             "content_type": EXT_BY_MIME.get(ext, "image/jpeg"),
             "size": len(data),
             "uploaded_by": "seed",
+            "access": "public_asset",
             "created_at": utcnow(),
             "is_deleted": False,
             "seed_key": key,
@@ -103,6 +106,16 @@ async def save_seed_image(key: str, url: str) -> str | None:
 
 
 async def seed() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--staging-synthetic", action="store_true")
+    args = parser.parse_args()
+    environment = os.getenv("APP_ENV", "development")
+    if environment == "production":
+        raise SystemExit("The synthetic catalog bootstrap cannot run in production.")
+    if environment == "staging" and not args.staging_synthetic:
+        raise SystemExit("Staging requires the explicit --staging-synthetic flag.")
+    if args.staging_synthetic and environment != "staging":
+        raise SystemExit("--staging-synthetic requires APP_ENV=staging.")
     await ensure_indexes()
 
     print("→ contas")

@@ -1,16 +1,20 @@
 """Real Mongo replica + ASGI; synthetic users, external HTTP replaced by a deny-all transport."""
 import asyncio
 import hashlib
+import logging
 import os
 import uuid
+import time
 from datetime import timedelta
 from types import SimpleNamespace
 
 import httpx
 import jwt
+import pyotp
 import pytest
+from cryptography.fernet import Fernet
 from motor.motor_asyncio import AsyncIOMotorClient
-from lib import db as database_module, security
+from lib import db as database_module, security, mfa, audit as audit_module
 from lib.dates import utcnow
 from routers import auth, admin, orders, files, favorites, catalog
 from server import app
@@ -26,7 +30,7 @@ async def secure(monkeypatch):
     mongo = AsyncIOMotorClient(url, tz_aware=True, serverSelectionTimeoutMS=3000)
     name = 'security_test_' + uuid.uuid4().hex
     db = mongo[name]
-    for module in (database_module, security, auth, admin, orders, files, favorites, catalog):
+    for module in (database_module, security, mfa, auth, admin, orders, files, favorites, catalog):
         monkeypatch.setattr(module, 'db', db)
     await database_module.ensure_indexes()
     monkeypatch.setenv('PUBLIC_ORIGIN', 'https://shop.test')
@@ -36,6 +40,8 @@ async def secure(monkeypatch):
     monkeypatch.setenv('PAYPAL_CLIENT_SECRET', 'synthetic')
     monkeypatch.setenv('PAYPAL_MODE', 'sandbox')
     monkeypatch.setenv('GOOGLE_AUTH_ENABLED', 'false')
+    monkeypatch.setenv('MFA_ENCRYPTION_KEY', 'MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA=')
+    monkeypatch.setenv('MFA_REQUIRED', 'false')
     monkeypatch.delenv('RESET_WEBHOOK_URL', raising=False)
     monkeypatch.delenv('RESET_WEBHOOK_TOKEN', raising=False)
     monkeypatch.delenv('RESET_WEBHOOK_ALLOWED_HOSTS', raising=False)
@@ -70,6 +76,16 @@ async def secure(monkeypatch):
 
 def cart(qty=1, key=None):
     return {'idempotency_key': key or str(uuid.uuid4()), 'items': [{'product_id': 'product', 'qty': qty}]}
+
+
+def test_mfa_encryption_key_rotation_window(monkeypatch):
+    previous = Fernet.generate_key().decode()
+    current = Fernet.generate_key().decode()
+    monkeypatch.setenv('MFA_ENCRYPTION_KEY', previous)
+    encrypted = mfa.encrypt_secret('synthetic-totp-seed')
+    monkeypatch.setenv('MFA_ENCRYPTION_KEY', current)
+    monkeypatch.setenv('MFA_ENCRYPTION_KEY_PREVIOUS', previous)
+    assert mfa.decrypt_secret(encrypted) == 'synthetic-totp-seed'
 
 
 async def test_anonymous_and_buyer_cannot_admin(secure):
@@ -108,7 +124,7 @@ async def test_reset_single_use_hash_expiry_revocation(secure, monkeypatch):
     response = await secure.api.post('/api/auth/forgot-password', json={'email': 'comprador@example.com'})
     missing = await secure.api.post('/api/auth/forgot-password', json={'email': 'missing@example.com'})
     assert response.json() == missing.json()
-    assert response.json()['reset_token'] is None
+    assert 'reset_token' not in response.json()
     token = secure.delivery[0]['token']
     doc = await secure.db.password_reset_tokens.find_one({})
     assert doc['token'] == hashlib.sha256(token.encode()).hexdigest() and token not in str(doc)
@@ -162,6 +178,12 @@ async def test_role_change_revokes_previous_access(secure):
     assert (await secure.api.get('/api/auth/me', headers=old)).status_code == 401
 
 
+async def test_logout_revokes_bearer_sessions_too(secure):
+    copied = secure.headers()
+    assert (await secure.api.post('/api/auth/logout', json={}, headers=copied)).status_code == 200
+    assert (await secure.api.get('/api/auth/me', headers=copied)).status_code == 401
+
+
 async def test_login_rate_pair_does_not_lock_other_source(secure):
     for _ in range(10):
         assert (await secure.api.post('/api/auth/login', json={'email': 'admin@example.com', 'password': 'wrong'})).status_code == 401
@@ -187,9 +209,10 @@ async def test_forwarding_headers_do_not_bypass_rate_limit(secure):
     assert response.status_code == 429
 
 
-async def test_google_disabled_and_no_password_does_not_crash(secure):
+async def test_retired_google_routes_are_not_exposed(secure):
     assert not security.verify_password('test', None)
-    assert (await secure.api.post('/api/auth/google/session', json={'session_id': 'fake'})).status_code == 503
+    assert (await secure.api.get('/api/auth/options')).status_code == 404
+    assert (await secure.api.post('/api/auth/google/session', json={'session_id': 'fake'})).status_code == 404
 
 
 async def test_csrf_body_limit_and_safe_error(secure):
@@ -261,9 +284,68 @@ async def test_capture_amount_currency_and_pending_cancel(secure, monkeypatch):
     monkeypatch.setattr(orders, 'paypal_capture', capture)
     for _ in range(2):
         assert (await secure.api.post('/api/payments/paypal/capture', json={'order_id': order['id']}, headers=secure.headers())).status_code == 409
-    assert calls[0] == calls[1] and len(calls[0]) <= 38
+    assert len(calls) == 1 and len(calls[0]) <= 38
     assert (await secure.api.post('/api/payments/paypal/cancel', json={'order_id': order['id']}, headers=secure.headers())).status_code == 409
-    assert (await secure.db.orders.find_one({'id': order['id']}))['payment_status'] == 'processando'
+    assert (await secure.db.orders.find_one({'id': order['id']}))['payment_status'] == 'revisao_necessaria'
+
+
+async def test_payment_reconciliation_is_idempotent_and_never_moves_stock_twice(secure, monkeypatch):
+    order = (await secure.api.post('/api/orders', json=cart(), headers=secure.headers())).json()
+    await secure.db.orders.update_one({'id': order['id']}, {'$set': {
+        'paypal_order_id': 'provider-test', 'payment_status': 'processando',
+    }})
+    calls = []
+
+    async def provider_state(provider_id):
+        calls.append(provider_id)
+        return {
+            'id': provider_id,
+            'status': 'COMPLETED',
+            'purchase_units': [{'payments': {'captures': [{
+                'status': 'COMPLETED', 'amount': {'currency_code': 'BRL', 'value': '10.25'},
+            }]}}],
+        }
+
+    monkeypatch.setattr(orders, 'paypal_get', provider_state)
+    for _ in range(2):
+        result = await secure.api.post('/api/payments/paypal/reconcile',
+                                       json={'order_id': order['id']}, headers=secure.headers())
+        assert result.status_code == 200 and result.json()['payment_status'] == 'pago'
+    assert calls == ['provider-test']
+    assert (await secure.db.products.find_one({'id': 'product'}))['stock'] == 4
+
+
+async def test_payment_reconciliation_marks_ambiguous_state_for_review(secure, monkeypatch):
+    order = (await secure.api.post('/api/orders', json=cart(), headers=secure.headers())).json()
+    await secure.db.orders.update_one({'id': order['id']}, {'$set': {
+        'paypal_order_id': 'provider-test', 'payment_status': 'processando',
+    }})
+
+    async def ambiguous(_provider_id):
+        return {'id': 'different-provider-id', 'status': 'COMPLETED', 'purchase_units': []}
+
+    monkeypatch.setattr(orders, 'paypal_get', ambiguous)
+    result = await secure.api.post('/api/payments/paypal/reconcile',
+                                   json={'order_id': order['id']}, headers=secure.headers())
+    assert result.status_code == 200 and result.json()['payment_status'] == 'revisao_necessaria'
+    assert (await secure.api.post('/api/payments/paypal/cancel',
+                                  json={'order_id': order['id']}, headers=secure.headers())).status_code == 409
+
+
+def test_security_log_redaction(caplog):
+    caplog.set_level(logging.INFO)
+    audit_module.audit_event('TEST_EVENT', details={
+        'password': 'password-marker',
+        'Authorization': 'Bearer authorization-marker',
+        'mfa_secret': 'totp-marker',
+        'recovery_code': 'recovery-marker',
+        'connection_string': 'mongodb://connection-marker',
+        'safe': 'visible',
+    })
+    output = '\n'.join(record.getMessage() for record in caplog.records)
+    assert 'visible' in output and '[REDACTED]' in output
+    for marker in ('password-marker', 'authorization-marker', 'totp-marker', 'recovery-marker', 'connection-marker'):
+        assert marker not in output
 
 
 async def test_emergency_pause(secure, monkeypatch):
@@ -271,6 +353,198 @@ async def test_emergency_pause(secure, monkeypatch):
     assert (await secure.api.post('/api/orders', json=cart(), headers=secure.headers())).status_code == 503
     assert not (await secure.api.get('/api/payments/status')).json()['paypal_configured']
     assert await secure.db.orders.count_documents({}) == 0
+
+
+async def test_login_and_absolute_session_deadline(secure, monkeypatch):
+    monkeypatch.setenv('COOKIE_SECURE', 'true')
+    response = await secure.api.post('/api/auth/login', json={'email': 'admin@example.com', 'password': PASSWORD})
+    assert response.status_code == 200
+    for cookie in response.headers.get_list('set-cookie'):
+        assert 'HttpOnly' in cookie and 'Secure' in cookie and 'SameSite=lax' in cookie
+    assert (await secure.api.get('/api/admin/indoor')).status_code == 200
+    original = int((utcnow() - timedelta(hours=7)).timestamp())
+    token = security.create_refresh_token(secure.users['admin'], original)
+    response = await secure.api.post('/api/auth/refresh', json={}, headers={'Cookie': f'gs_refresh_token={token}'})
+    assert response.status_code == 200
+    rotated = security.decode_token(secure.api.cookies.get('gs_refresh_token'), 'refresh')
+    assert rotated['auth_time'] == original and rotated['exp'] <= original + 8 * 3600
+    expired = security.create_refresh_token(secure.users['admin'], int((utcnow()-timedelta(hours=9)).timestamp()))
+    assert security.decode_token(expired, 'refresh') is None
+
+
+async def test_staff_mfa_setup_login_recovery_and_password_reset(secure, monkeypatch):
+    headers = secure.headers('admin')
+    setup = await secure.api.post('/api/auth/mfa/setup', headers=headers, json={'current_password': PASSWORD})
+    assert setup.status_code == 200 and setup.json()['secret'] not in str(await secure.db.users.find_one({'id': 'admin'}))
+    secret = setup.json()['secret']
+    confirm = await secure.api.post('/api/auth/mfa/confirm', headers=headers, json={
+        'current_password': PASSWORD, 'code': pyotp.TOTP(secret).now(),
+    })
+    assert confirm.status_code == 200 and len(confirm.json()['recovery_codes']) == 10
+    assert (await secure.api.post('/api/auth/login', json={'email': 'admin@example.com', 'password': PASSWORD})).status_code == 401
+    login = await secure.api.post('/api/auth/login', json={
+        'email': 'admin@example.com', 'password': PASSWORD, 'mfa_code': pyotp.TOTP(secret).now(),
+    })
+    assert login.status_code == 200
+    recovery = confirm.json()['recovery_codes'][0]
+    secure.api.cookies.clear()
+    assert (await secure.api.post('/api/auth/login', json={
+        'email': 'admin@example.com', 'password': PASSWORD, 'mfa_code': recovery,
+    })).status_code == 200
+    secure.api.cookies.clear()
+    assert (await secure.api.post('/api/auth/login', json={
+        'email': 'admin@example.com', 'password': PASSWORD, 'mfa_code': recovery,
+    })).status_code == 401
+
+    monkeypatch.setenv('RESET_WEBHOOK_URL', 'https://reset.test/deliver')
+    monkeypatch.setenv('RESET_WEBHOOK_TOKEN', 'synthetic-not-a-credential')
+    monkeypatch.setenv('RESET_WEBHOOK_ALLOWED_HOSTS', 'reset.test')
+    await secure.api.post('/api/auth/forgot-password', json={'email': 'admin@example.com'})
+    token = secure.delivery[-1]['token']
+    reset_recovery_code = confirm.json()['recovery_codes'][1]
+    assert (await secure.api.post('/api/auth/reset-password', json={
+        'token': token, 'new_password': PASSWORD,
+    })).status_code == 401
+    assert (await secure.api.post('/api/auth/reset-password', json={
+        'token': token, 'new_password': PASSWORD, 'mfa_code': reset_recovery_code,
+    })).status_code == 200
+    after_reset = await secure.db.users.find_one({'id': 'admin'})
+    assert after_reset['mfa_enabled'] is True and after_reset['mfa_secret']
+
+
+async def test_recovery_codes_can_be_regenerated_once_and_old_codes_are_invalid(secure):
+    secret = mfa.new_secret()
+    old_code = mfa.new_recovery_codes()[0]
+    await secure.db.users.update_one({'id': 'admin'}, {'$set': {
+        'mfa_enabled': True,
+        'mfa_secret': mfa.encrypt_secret(secret),
+        'mfa_recovery_codes': [mfa.recovery_digest('admin', old_code)],
+    }})
+    user = {**secure.users['admin'], 'mfa_enabled': True}
+    headers = {'Authorization': 'Bearer ' + security.create_access_token(user, mfa_verified=True)}
+    response = await secure.api.post('/api/auth/mfa/recovery-codes/regenerate', headers=headers, json={})
+    assert response.status_code == 200 and len(response.json()['recovery_codes']) == 10
+    new_code = response.json()['recovery_codes'][0]
+    stored = await secure.db.users.find_one({'id': 'admin'}, {'_id': 0})
+    assert old_code not in str(stored) and new_code not in str(stored)
+    secure.api.cookies.clear()
+    assert (await secure.api.post('/api/auth/login', json={
+        'email': 'admin@example.com', 'password': PASSWORD, 'mfa_code': old_code,
+    })).status_code == 401
+    assert (await secure.api.post('/api/auth/login', json={
+        'email': 'admin@example.com', 'password': PASSWORD, 'mfa_code': new_code,
+    })).status_code == 200
+    secure.api.cookies.clear()
+    assert (await secure.api.post('/api/auth/login', json={
+        'email': 'admin@example.com', 'password': PASSWORD, 'mfa_code': new_code,
+    })).status_code == 401
+
+
+async def test_admin_mfa_recovery_requires_other_stepped_up_admin_and_revokes_sessions(secure):
+    admin_secret, target_secret = mfa.new_secret(), mfa.new_secret()
+    await secure.db.users.update_one({'id': 'admin'}, {'$set': {
+        'mfa_enabled': True, 'mfa_secret': mfa.encrypt_secret(admin_secret), 'mfa_recovery_codes': [],
+    }})
+    await secure.db.users.update_one({'id': 'atendente'}, {'$set': {
+        'role': 'admin', 'mfa_enabled': True, 'mfa_secret': mfa.encrypt_secret(target_secret),
+        'mfa_recovery_codes': [],
+    }})
+    admin_user = {**secure.users['admin'], 'mfa_enabled': True}
+    target_user = {**secure.users['atendente'], 'role': 'admin', 'mfa_enabled': True}
+    admin_headers = {'Authorization': 'Bearer ' + security.create_access_token(admin_user, mfa_verified=True)}
+    old_target_headers = {'Authorization': 'Bearer ' + security.create_access_token(target_user, mfa_verified=True)}
+
+    assert (await secure.api.post('/api/auth/mfa/admin-recovery/request/atendente',
+                                  headers=secure.headers(), json={})).status_code == 403
+    stale_token = security.create_access_token(admin_user, reauthenticated_at=int(time.time()) - 601,
+                                                mfa_verified=True)
+    assert (await secure.api.post('/api/auth/mfa/admin-recovery/request/atendente',
+                                  headers={'Authorization': 'Bearer ' + stale_token}, json={})).status_code == 403
+    assert (await secure.api.post('/api/auth/mfa/admin-recovery/request/admin',
+                                  headers=admin_headers, json={})).status_code == 400
+
+    requested = await secure.api.post('/api/auth/mfa/admin-recovery/request/atendente', headers=admin_headers, json={})
+    assert requested.status_code == 200
+    recovery_token = requested.json()['recovery_token']
+    stored = await secure.db.users.find_one({'id': 'atendente'}, {'_id': 0})
+    assert recovery_token not in str(stored) and stored['mfa_enabled'] is True
+    assert (await secure.api.get('/api/auth/me', headers=old_target_headers)).status_code == 401
+
+    setup_payload = {'email': 'atendente@example.com', 'password': PASSWORD, 'recovery_token': recovery_token}
+    setup = await secure.api.post('/api/auth/mfa/admin-recovery/setup', json=setup_payload)
+    assert setup.status_code == 200
+    new_secret = setup.json()['secret']
+    complete = await secure.api.post('/api/auth/mfa/admin-recovery/complete', json={
+        **setup_payload, 'code': pyotp.TOTP(new_secret).now(),
+    })
+    assert complete.status_code == 200 and len(complete.json()['recovery_codes']) == 10
+    assert (await secure.api.post('/api/auth/mfa/admin-recovery/complete', json={
+        **setup_payload, 'code': pyotp.TOTP(new_secret).at(time.time() + 30),
+    })).status_code in {401, 409}
+    assert (await secure.api.post('/api/auth/login', json={
+        'email': 'atendente@example.com', 'password': PASSWORD, 'mfa_code': pyotp.TOTP(target_secret).now(),
+    })).status_code == 401
+    assert (await secure.api.post('/api/auth/login', json={
+        'email': 'atendente@example.com', 'password': PASSWORD, 'mfa_code': pyotp.TOTP(new_secret).now(),
+    })).status_code == 200
+
+
+async def test_recent_auth_and_password_change_revoke_sessions(secure):
+    old = secure.headers('admin')
+    payload = jwt.decode(old['Authorization'][7:], security.JWT_SECRET, algorithms=['HS256'],
+                         audience=security.JWT_AUDIENCE)
+    payload['reauth_at'] -= 601
+    stale = {'Authorization': 'Bearer ' + jwt.encode(payload, security.JWT_SECRET, algorithm='HS256')}
+    assert (await secure.api.patch('/api/admin/products/product', headers=stale, json={'stock': 4})).status_code == 403
+    reauth = await secure.api.post('/api/auth/reauthenticate', headers=stale, json={'password': PASSWORD})
+    assert reauth.status_code == 200
+    assert (await secure.api.patch('/api/admin/products/product', json={'stock': 4})).status_code == 200
+    changed = await secure.api.post('/api/auth/change-password', headers=old, json={
+        'current_password': PASSWORD, 'new_password': 'Another synthetic password 42!',
+    })
+    assert changed.status_code == 200
+    assert (await secure.api.get('/api/auth/me', headers=old)).status_code == 401
+
+
+async def test_attendant_cannot_read_customers_reports_or_admin_summary(secure):
+    for path in ('customers', 'reports', 'dashboard'):
+        assert (await secure.api.get('/api/admin/' + path, headers=secure.headers('atendente'))).status_code == 403
+
+
+async def test_successful_capture_replay_and_delivery_sequence(secure, monkeypatch):
+    order = (await secure.api.post('/api/orders', json=cart(), headers=secure.headers())).json()
+    await secure.db.orders.update_one({'id': order['id']}, {'$set': {'paypal_order_id': 'provider-test'}})
+    calls = []
+    async def capture(provider_id, *, request_id):
+        calls.append(request_id)
+        return {'id': provider_id, 'status': 'COMPLETED', 'purchase_units': [{'payments': {'captures': [{'status': 'COMPLETED', 'amount': {'currency_code': 'BRL', 'value': '10.25'}}]}}]}
+    monkeypatch.setattr(orders, 'paypal_capture', capture)
+    for _ in range(2):
+        result = await secure.api.post('/api/payments/paypal/capture', json={'order_id': order['id']}, headers=secure.headers())
+        assert result.status_code == 200 and result.json()['payment_status'] == 'pago'
+    assert len(calls) == 1
+    assert (await secure.db.products.find_one({'id': 'product'}))['stock'] == 4
+    for state, expected in [('entregue', 409), ('preparando', 200), ('aprovado', 409), ('enviado', 200), ('em_transito', 200), ('entregue', 200)]:
+        response = await secure.api.patch('/api/admin/orders/'+order['id'], json={'status': state}, headers=secure.headers('admin'))
+        assert response.status_code == expected
+
+
+async def test_untrusted_payment_redirect_is_rejected(secure, monkeypatch):
+    order = (await secure.api.post('/api/orders', json=cart(), headers=secure.headers())).json()
+    async def forbidden(**kwargs):
+        raise AssertionError('Provider must not be called for invalid redirects')
+    monkeypatch.setattr(orders, 'paypal_create', forbidden)
+    response = await secure.api.post('/api/payments/paypal/create', headers=secure.headers(), json={
+        'order_id': order['id'], 'return_url': 'https://attacker.test/', 'cancel_url': 'https://shop.test/checkout'})
+    assert response.status_code == 422
+
+
+async def test_pending_order_limit_holds_under_concurrency(secure):
+    await secure.db.products.update_one({'id': 'product'}, {'$set': {'stock': 20}})
+    responses = await asyncio.gather(*[secure.api.post('/api/orders', json=cart(), headers=secure.headers()) for _ in range(7)])
+    assert sorted(r.status_code for r in responses) == [200]*5 + [409]*2
+    assert await secure.db.orders.count_documents({}) == 5
+    assert (await secure.db.products.find_one({'id': 'product'}))['stock'] == 15
 
 
 async def test_false_webhook_has_no_handler(secure):
@@ -283,7 +557,7 @@ async def test_storage_path_cannot_escape(secure, tmp_path, monkeypatch):
     outside = tmp_path / 'private.txt'
     outside.write_text('SENSITIVE-MARKER')
     monkeypatch.setattr(files, 'STORAGE_DIR', root)
-    await secure.db.files.insert_one({'id': 'outside', 'is_deleted': False, 'storage_path': str(outside), 'content_type': 'image/png'})
+    await secure.db.files.insert_one({'id': 'outside', 'is_deleted': False, 'access': 'public_asset', 'storage_path': str(outside), 'content_type': 'image/png'})
     response = await secure.api.get('/api/files/outside')
     assert response.status_code == 404 and 'SENSITIVE-MARKER' not in response.text
 
@@ -303,3 +577,19 @@ async def test_private_file_is_never_served_by_public_asset_route(secure, tmp_pa
     })
     response = await secure.api.get('/api/files/private')
     assert response.status_code == 404 and 'private-file-marker' not in response.text
+
+
+async def test_unclassified_legacy_file_is_not_public(secure, tmp_path, monkeypatch):
+    root = tmp_path / 'uploads'
+    root.mkdir()
+    legacy = root / 'legacy.png'
+    legacy.write_bytes(b'legacy-file-marker')
+    monkeypatch.setattr(files, 'STORAGE_DIR', root)
+    await secure.db.files.insert_one({
+        'id': 'legacy',
+        'is_deleted': False,
+        'storage_path': str(legacy),
+        'content_type': 'image/png',
+    })
+    response = await secure.api.get('/api/files/legacy')
+    assert response.status_code == 404 and 'legacy-file-marker' not in response.text

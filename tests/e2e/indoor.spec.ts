@@ -100,7 +100,10 @@ test('admin uploads, edits, orders, toggles and deletes', async ({ page }) => {
     return route.fallback();
   });
   await page.route('**/api/admin/banners/*', async route => {
-    if (route.request().method() === 'DELETE') { rows = []; return route.fulfill({ json: { ok: true } }); }
+    if (route.request().method() === 'DELETE') {
+      expect(route.request().headers()['content-type']).toBe('application/json');
+      rows = []; return route.fulfill({ json: { ok: true } });
+    }
     rows[0] = { ...rows[0], ...route.request().postDataJSON() };
     return route.fulfill({ json: rows[0] });
   });

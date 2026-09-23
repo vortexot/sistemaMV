@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Eye, EyeOff, KeyRound, Mail, UserRound } from "lucide-react";
 import { toast } from "sonner";
 
-import { apiErrorMessage, apiGet, apiPost } from "@/lib/api";
+import { apiErrorMessage, apiPost } from "@/lib/api";
 import { publicAsset } from "@/lib/assets";
 import { beginSession, useSession } from "@/lib/session";
 import type { User } from "@/lib/types";
@@ -31,6 +31,7 @@ export default function Login() {
 
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [loginMfaCode, setLoginMfaCode] = useState("");
   const [regName, setRegName] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
@@ -39,15 +40,15 @@ export default function Login() {
   const [forgotEmail, setForgotEmail] = useState("");
   const [recoveryRequested, setRecoveryRequested] = useState(false);
   const [resetToken, setResetToken] = useState("");
-  const authOptions = useQuery({ queryKey: ["auth-options"], queryFn: () => apiGet<{ google_enabled: boolean }>("/auth/options") });
   const [resetPassword, setResetPassword] = useState("");
+  const [resetMfaCode, setResetMfaCode] = useState("");
 
   useEffect(() => {
     if (user) navigate(user.role === "comprador" ? "/dashboard" : "/admin", { replace: true });
   }, [user, navigate]);
 
   const loginMutation = useMutation({
-    mutationFn: (body: { email: string; password: string }) =>
+    mutationFn: (body: { email: string; password: string; mfa_code?: string }) =>
       apiPost<User>("/auth/login", body),
     onSuccess: async (u) => {
       await beginSession();
@@ -69,17 +70,17 @@ export default function Login() {
   });
 
   const forgotMutation = useMutation({
-    mutationFn: (email: string) => apiPost<{ message: string; reset_token: string | null }>("/auth/forgot-password", { email }),
+    mutationFn: (email: string) => apiPost<{ message: string }>("/auth/forgot-password", { email }),
     onSuccess: (data) => {
       toast.success(data.message);
       setRecoveryRequested(true);
-      setResetToken(data.reset_token ?? "");
+      setResetToken("");
     },
     onError: (error) => toast.error(apiErrorMessage(error)),
   });
 
   const resetMutation = useMutation({
-    mutationFn: (body: { token: string; new_password: string }) =>
+    mutationFn: (body: { token: string; new_password: string; mfa_code?: string }) =>
       apiPost<{ message: string }>("/auth/reset-password", body),
     onSuccess: (data) => {
       toast.success(data.message);
@@ -89,12 +90,6 @@ export default function Login() {
     },
     onError: (error) => toast.error(apiErrorMessage(error)),
   });
-
-  // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-  const handleGoogleLogin = () => {
-    const redirectUrl = window.location.origin + "/auth/callback";
-    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
-  };
 
   return (
     <div data-testid="login-page" className="mx-auto grid min-h-[calc(100svh-8rem)] w-full max-w-7xl items-stretch gap-10 px-4 py-8 sm:px-8 sm:py-12 lg:grid-cols-2">
@@ -146,23 +141,6 @@ export default function Login() {
             Acompanhe pedidos, favoritos e ofertas exclusivas.
           </p>
 
-          {authOptions.data?.google_enabled && <Button
-            type="button"
-            data-testid="google-login-button"
-            onClick={handleGoogleLogin}
-            variant="outline"
-            className="mt-6 w-full gap-3 border-[#242424] bg-[#0B0B0B] text-white hover:border-[#DAA520] hover:text-[#DAA520]"
-          >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
-              <path fill="#EA4335" d="M12 10.2v3.9h5.4c-.24 1.4-1.66 4.1-5.4 4.1-3.25 0-5.9-2.7-5.9-6s2.65-6 5.9-6c1.85 0 3.1.79 3.8 1.46l2.6-2.5C16.55 3.85 14.5 3 12 3 7 3 3 7 3 12s4 9 9 9c5.2 0 8.65-3.65 8.2-8.8H12z" />
-            </svg>
-            Continuar com Google
-          </Button>}
-
-          <div className="my-5 flex items-center gap-3 text-[11px] font-bold uppercase tracking-[0.25em] text-[#BDBDBD]">
-            <span className="h-px flex-1 bg-[#242424]" /> ou e-mail <span className="h-px flex-1 bg-[#242424]" />
-          </div>
-
           <Tabs value={tab} onValueChange={(value: string) => setTab(value)}>
             <TabsList className="w-full" data-testid="login-tabs">
               <TabsTrigger value="login" className="flex-1">Entrar</TabsTrigger>
@@ -175,7 +153,7 @@ export default function Login() {
                 className="mt-5 space-y-4"
                 onSubmit={(event) => {
                   event.preventDefault();
-                  loginMutation.mutate({ email: loginEmail.trim(), password: loginPassword });
+                  loginMutation.mutate({ email: loginEmail.trim(), password: loginPassword, ...(loginMfaCode ? { mfa_code: loginMfaCode } : {}) });
                 }}
               >
                 <div className="space-y-1.5">
@@ -194,6 +172,10 @@ export default function Login() {
                       className="pl-9"
                     />
                   </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="login-mfa">Código MFA ou de recuperação (equipe)</Label>
+                  <Input id="login-mfa" data-testid="login-mfa-input" autoComplete="one-time-code" value={loginMfaCode} onChange={(e) => setLoginMfaCode(e.target.value)} />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="login-password">Senha</Label>
@@ -383,11 +365,15 @@ export default function Login() {
                     placeholder="Mínimo 15 caracteres"
                   />
                 </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="reset-mfa">Código MFA ou de recuperação (equipe)</Label>
+                  <Input id="reset-mfa" autoComplete="one-time-code" value={resetMfaCode} onChange={(e) => setResetMfaCode(e.target.value)} />
+                </div>
                 <Button
                   type="button"
                   data-testid="reset-submit-button"
                   disabled={resetMutation.isPending || !resetToken.trim() || resetPassword.length < 15}
-                  onClick={() => resetMutation.mutate({ token: resetToken, new_password: resetPassword })}
+                  onClick={() => resetMutation.mutate({ token: resetToken, new_password: resetPassword, ...(resetMfaCode ? { mfa_code: resetMfaCode } : {}) })}
                   className="w-full bg-[#DAA520] font-bold uppercase tracking-wide text-[#0B0B0B] hover:bg-[#A07C1B]"
                 >
                   {resetMutation.isPending ? "Redefinindo…" : "Redefinir senha"}

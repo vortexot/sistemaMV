@@ -1,4 +1,5 @@
 import { Link, NavLink, Navigate, Outlet, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import {
   BarChart3,
   Boxes,
@@ -28,15 +29,15 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: "/admin", label: "Dashboard", icon: LayoutDashboard, key: "dashboard", roles: ["admin", "atendente"], end: true },
+  { to: "/admin", label: "Dashboard", icon: LayoutDashboard, key: "dashboard", roles: ["admin"], end: true },
   { to: "/admin/produtos", label: "Produtos", icon: Package, key: "products", roles: ["admin"] },
   { to: "/admin/categorias", label: "Categorias", icon: Tags, key: "categories", roles: ["admin"] },
   { to: "/admin/midia-indoor", label: "Mídia Indoor", icon: ImageIcon, key: "banners", roles: ["admin"] },
   { to: "/admin/midia-indoor/tv", label: "TV da loja", icon: ImageIcon, key: "indoor-tv", roles: ["admin", "atendente"] },
   { to: "/admin/pedidos", label: "Pedidos", icon: ShoppingBag, key: "orders", roles: ["admin", "atendente"] },
-  { to: "/admin/clientes", label: "Clientes", icon: Users, key: "customers", roles: ["admin", "atendente"] },
+  { to: "/admin/clientes", label: "Clientes", icon: Users, key: "customers", roles: ["admin"] },
   { to: "/admin/estoque", label: "Estoque", icon: Boxes, key: "stock", roles: ["admin", "atendente"] },
-  { to: "/admin/relatorios", label: "Relatórios", icon: BarChart3, key: "reports", roles: ["admin", "atendente"] },
+  { to: "/admin/relatorios", label: "Relatórios", icon: BarChart3, key: "reports", roles: ["admin"] },
 ];
 
 function BrandBlock() {
@@ -81,8 +82,12 @@ export default function AdminLayout() {
   const items = NAV_ITEMS.filter((item) => item.roles.includes(user.role));
 
   const handleLogout = async () => {
-    await endSession();
-    navigate("/login");
+    try {
+      await endSession();
+      navigate("/login");
+    } catch {
+      toast.error("Não foi possível encerrar a sessão. Verifique sua conexão e tente novamente.");
+    }
   };
 
   return (
@@ -132,6 +137,12 @@ export default function AdminLayout() {
           >
             <LogOut className="h-4 w-4" /> Sair
           </Button>
+          <Link
+            to="/seguranca"
+            className="block px-3 text-xs text-[#BDBDBD] transition-colors hover:text-[#DAA520]"
+          >
+            Segurança da conta
+          </Link>
           <Link
             to="/"
             className="block px-3 text-xs text-[#BDBDBD] transition-colors hover:text-[#DAA520]"

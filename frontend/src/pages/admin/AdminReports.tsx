@@ -38,7 +38,7 @@ export default function AdminReports() {
           Relatórios
         </h1>
         <p className="mt-1 text-sm text-[#BDBDBD]">
-          Todos os números vêm de pedidos reais — nada é inventado nesta demonstração.
+          Todos os números vêm de pedidos reais registrados pelo sistema.
         </p>
       </div>
 

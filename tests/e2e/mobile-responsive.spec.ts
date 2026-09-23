@@ -28,7 +28,7 @@ const adminProduct = {
   updated_at: "2026-09-22T00:00:00Z",
 };
 
-async function mockPublicApi(page: Page) {
+async function stubPublicApi(page: Page) {
   await page.route("**/api/**", async (route) => {
     const pathname = new URL(route.request().url()).pathname;
     if (pathname === "/api/auth/me") {
@@ -56,7 +56,8 @@ async function expectNoPageOverflow(page: Page) {
 }
 
 test("public purchase journey remains usable across the mobile matrix", async ({ page }) => {
-  await mockPublicApi(page);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await stubPublicApi(page);
 
   for (const width of [320, 360, 375, 390, 412, 430, 768]) {
     await page.setViewportSize({ width, height: width === 768 ? 1024 : 844 });
@@ -98,7 +99,7 @@ test("public purchase journey remains usable across the mobile matrix", async ({
 });
 
 test("menu, quick view and form remain accessible on a narrow dynamic viewport", async ({ page }) => {
-  await mockPublicApi(page);
+  await stubPublicApi(page);
   await page.setViewportSize({ width: 320, height: 568 });
   await page.goto("/");
 

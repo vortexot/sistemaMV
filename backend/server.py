@@ -17,12 +17,21 @@ load_dotenv(ROOT_DIR / '.env')
 
 # MongoDB connection
 from lib.db import client, db, ensure_indexes
+from lib.runtime_config import cors_origins, validate_production_config
 
 
 # Startup runs before the yield, shutdown after it. Add your own setup/teardown here.
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    validate_production_config()
     await ensure_indexes()  # Uniqueness and revocation indexes are security prerequisites.
+    if os.getenv('APP_ENV') in {'staging', 'production'}:
+        unready = await db.users.count_documents({
+            'role': {'$in': ['admin', 'atendente']}, 'status': 'ativo', 'mfa_enabled': {'$ne': True},
+        })
+        admins = await db.users.count_documents({'role': 'admin', 'status': 'ativo', 'mfa_enabled': True})
+        if unready or not admins:
+            raise RuntimeError('Production requires MFA on every active staff account and at least one active admin.')
     yield
     client.close()
 
@@ -46,7 +55,7 @@ class StatusCheckCreate(BaseModel):
 # Add your routes to the router instead of directly to app
 @api_router.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"service": "mv-api", "status": "ok"}
 
 @api_router.get("/status", response_model=List[StatusCheck])
 async def get_status_checks():
@@ -68,7 +77,7 @@ app.include_router(api_router)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=[x.strip() for x in os.environ.get('CORS_ORIGINS', 'http://localhost:3000').split(',') if x.strip() != '*'],
+    allow_origins=cors_origins(),
     allow_methods=['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allow_headers=['Content-Type', 'Authorization', 'Idempotency-Key'],
 )

@@ -10,7 +10,8 @@ from pydantic import ValidationError
 
 from lib.db import db
 from lib.dates import utcnow, with_utc
-from lib.security import require_roles
+from lib.audit import audit_event
+from lib.security import require_recent_auth, require_roles
 from models.admin import (
     CustomerOut,
     CustomerUpdate,
@@ -35,9 +36,9 @@ from models.catalog import (
     ProductCreate,
     ProductUpdate,
 )
-from models.orders import ORDER_STATUS_LABELS, Order
+from models.orders import ORDER_STATUS_LABELS, Order, PaypalCaptureIn
 from routers.catalog import _category_map, _product_out
-from routers.orders import _attach_items
+from routers.orders import _attach_items, reconcile_payment
 
 router = APIRouter(prefix="/admin")
 
@@ -72,7 +73,7 @@ async def _touch_product_images(product_id: str, file_id: str | None, uploaded_b
 
 # ---------------------------------------------------------------- dashboard
 @router.get("/dashboard", response_model=DashboardOut)
-async def dashboard(user: dict = Depends(require_roles("admin", "atendente"))) -> DashboardOut:
+async def dashboard(user: dict = Depends(require_roles("admin"))) -> DashboardOut:
     produtos_ativos = await db.products.count_documents({"active": True, "archived": False})
     clientes = await db.users.count_documents({"role": "comprador"})
     pedidos = await db.orders.count_documents({})
@@ -112,7 +113,7 @@ async def admin_products(_: dict = Depends(require_roles("admin"))) -> list[Prod
 
 
 @router.post("/products", response_model=Product)
-async def create_product(input: ProductCreate, user: dict = Depends(require_roles("admin"))) -> Product:
+async def create_product(input: ProductCreate, user: dict = Depends(require_recent_auth("admin"))) -> Product:
     sku = input.sku.strip().upper()
     if await db.products.find_one({"sku": sku}, {"_id": 0}):
         raise HTTPException(status_code=409, detail="Já existe um produto com este SKU.")
@@ -148,7 +149,7 @@ async def create_product(input: ProductCreate, user: dict = Depends(require_role
 
 @router.patch("/products/{product_id}", response_model=Product)
 async def update_product(
-    product_id: str, input: ProductUpdate, user: dict = Depends(require_roles("admin"))
+    product_id: str, input: ProductUpdate, user: dict = Depends(require_recent_auth("admin"))
 ) -> Product:
     doc = await db.products.find_one({"id": product_id}, {"_id": 0})
     if not doc:
@@ -194,7 +195,7 @@ async def update_product(
 
 
 @router.delete("/products/{product_id}")
-async def delete_product(product_id: str, _: dict = Depends(require_roles("admin"))) -> dict:
+async def delete_product(product_id: str, _: dict = Depends(require_recent_auth("admin"))) -> dict:
     result = await db.products.update_one({'id': product_id}, {'$set': {'archived': True, 'active': False}})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Produto não encontrado.")
@@ -210,7 +211,7 @@ async def admin_categories(_: dict = Depends(require_roles("admin"))) -> list[Ca
 
 
 @router.post("/categories", response_model=Category)
-async def create_category(input: CategoryCreate, _: dict = Depends(require_roles("admin"))) -> Category:
+async def create_category(input: CategoryCreate, _: dict = Depends(require_recent_auth("admin"))) -> Category:
     slug = slugify(input.name)
     if await db.categories.find_one({"slug": slug}, {"_id": 0}):
         raise HTTPException(status_code=409, detail="Já existe uma categoria com este nome.")
@@ -228,7 +229,7 @@ async def create_category(input: CategoryCreate, _: dict = Depends(require_roles
 
 @router.patch("/categories/{category_id}", response_model=Category)
 async def update_category(
-    category_id: str, input: CategoryUpdate, _: dict = Depends(require_roles("admin"))
+    category_id: str, input: CategoryUpdate, _: dict = Depends(require_recent_auth("admin"))
 ) -> Category:
     doc = await db.categories.find_one({"id": category_id}, {"_id": 0})
     if not doc:
@@ -248,7 +249,7 @@ async def update_category(
 
 
 @router.delete("/categories/{category_id}")
-async def delete_category(category_id: str, _: dict = Depends(require_roles("admin"))) -> dict:
+async def delete_category(category_id: str, _: dict = Depends(require_recent_auth("admin"))) -> dict:
     if await db.products.find_one({"category_id": category_id}, {"_id": 0}):
         raise HTTPException(status_code=409, detail="Existem produtos nesta categoria. Mova-os antes de excluir.")
     result = await db.categories.delete_one({"id": category_id})
@@ -277,7 +278,7 @@ async def admin_banners(_: dict = Depends(require_roles("admin"))) -> list[Banne
 
 
 @router.post("/banners", response_model=Banner)
-async def create_banner(input: BannerCreate, _: dict = Depends(require_roles("admin"))) -> Banner:
+async def create_banner(input: BannerCreate, _: dict = Depends(require_recent_auth("admin"))) -> Banner:
     await _validate_banner_image(input.image_file_id)
     banner = Banner(**input.model_dump())
     await db.banners.insert_one(banner.model_dump())
@@ -286,7 +287,7 @@ async def create_banner(input: BannerCreate, _: dict = Depends(require_roles("ad
 
 @router.patch("/banners/{banner_id}", response_model=Banner)
 async def update_banner(
-    banner_id: str, input: BannerUpdate, _: dict = Depends(require_roles("admin"))
+    banner_id: str, input: BannerUpdate, _: dict = Depends(require_recent_auth("admin"))
 ) -> Banner:
     doc = await db.banners.find_one({"id": banner_id}, {"_id": 0})
     if not doc:
@@ -306,7 +307,7 @@ async def update_banner(
 
 
 @router.delete("/banners/{banner_id}")
-async def delete_banner(banner_id: str, _: dict = Depends(require_roles("admin"))) -> dict:
+async def delete_banner(banner_id: str, _: dict = Depends(require_recent_auth("admin"))) -> dict:
     result = await db.banners.delete_one({"id": banner_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Banner não encontrado.")
@@ -315,7 +316,7 @@ async def delete_banner(banner_id: str, _: dict = Depends(require_roles("admin")
 
 # ---------------------------------------------------------------- customers
 @router.get("/customers", response_model=list[CustomerOut])
-async def list_customers(_: dict = Depends(require_roles("admin", "atendente"))) -> list[CustomerOut]:
+async def list_customers(_: dict = Depends(require_roles("admin"))) -> list[CustomerOut]:
     docs = await db.users.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
     return [
         CustomerOut(**with_utc({k: doc.get(k) for k in CUSTOMER_FIELDS}))
@@ -325,7 +326,7 @@ async def list_customers(_: dict = Depends(require_roles("admin", "atendente")))
 
 @router.patch("/customers/{user_id}", response_model=CustomerOut)
 async def update_customer(
-    user_id: str, input: CustomerUpdate, admin: dict = Depends(require_roles("admin"))
+    user_id: str, input: CustomerUpdate, admin: dict = Depends(require_recent_auth("admin"))
 ) -> CustomerOut:
     if user_id == admin["id"]:
         raise HTTPException(status_code=400, detail="Você não pode alterar o próprio perfil.")
@@ -334,10 +335,14 @@ async def update_customer(
         raise HTTPException(status_code=422, detail="Perfil inválido.")
     if data.get("status") and data["status"] not in ("ativo", "bloqueado"):
         raise HTTPException(status_code=422, detail="Status inválido.")
+    before = await db.users.find_one({'id': user_id}, {'_id': 0, 'role': 1, 'status': 1})
     result = await db.users.update_one({"id": user_id}, {"$set": data, '$inc': {'token_version': 1}})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Cliente não encontrado.")
     fresh = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if 'role' in data:
+        audit_event('ROLE_CHANGE', actor_id=admin['id'], target_id=user_id,
+                    details={'from': before.get('role') if before else None, 'to': data['role']})
     return CustomerOut(**with_utc({k: fresh.get(k) for k in CUSTOMER_FIELDS}))
 
 
@@ -350,7 +355,7 @@ async def admin_orders(_: dict = Depends(require_roles("admin", "atendente"))) -
 
 @router.patch("/orders/{order_id}", response_model=Order)
 async def update_order(
-    order_id: str, input: OrderStatusUpdate, _: dict = Depends(require_roles("admin"))
+    order_id: str, input: OrderStatusUpdate, _: dict = Depends(require_recent_auth("admin"))
 ) -> Order:
     if input.status not in ORDER_STATUS_LABELS:
         raise HTTPException(status_code=422, detail="Status inválido.")
@@ -365,6 +370,16 @@ async def update_order(
         raise HTTPException(409, 'O pedido foi alterado. Atualize a página.')
     doc["status"] = input.status
     return await _attach_items(doc)
+
+
+@router.post('/payments/paypal/reconcile', response_model=Order)
+async def reconcile_paypal_as_admin(
+    input: PaypalCaptureIn, admin: dict = Depends(require_recent_auth('admin'))
+) -> Order:
+    order = await db.orders.find_one({'id': input.order_id}, {'_id': 0})
+    if not order:
+        raise HTTPException(404, 'Pedido nao encontrado.')
+    return await _attach_items(await reconcile_payment(order, admin['id']))
 
 
 # ---------------------------------------------------------------- stock
@@ -395,7 +410,7 @@ async def stock_rows(_: dict = Depends(require_roles("admin", "atendente"))) -> 
 
 @router.patch("/stock/{product_id}", response_model=StockRowOut)
 async def set_stock(
-    product_id: str, input: StockUpdate, _: dict = Depends(require_roles("admin"))
+    product_id: str, input: StockUpdate, _: dict = Depends(require_recent_auth("admin"))
 ) -> StockRowOut:
     if input.stock < 0:
         raise HTTPException(status_code=422, detail="Estoque não pode ser negativo.")
@@ -409,7 +424,7 @@ async def set_stock(
 
 # ---------------------------------------------------------------- reports
 @router.get("/reports", response_model=ReportOut)
-async def reports(_: dict = Depends(require_roles("admin", "atendente"))) -> ReportOut:
+async def reports(_: dict = Depends(require_roles("admin"))) -> ReportOut:
     pedidos_total = await db.orders.count_documents({})
     approved = await db.orders.find(
         {'payment_status': 'pago'},

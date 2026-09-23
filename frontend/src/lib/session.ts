@@ -27,10 +27,7 @@ export async function beginSession() {
 /** Every sign-out control must await this — clearing only the server session would leak
  * the previous account's react-query cache to the next login on this browser. */
 export async function endSession() {
-  try {
-    await apiPost("/auth/logout");
-  } catch {
-    // session may already be gone; clearing local state is what matters
-  }
+  // A network failure does not revoke the httpOnly cookie. Do not report a successful logout.
+  await apiPost("/auth/logout");
   queryClient.clear();
 }

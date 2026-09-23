@@ -15,6 +15,7 @@ class UserPublic(BaseModel):
     role: str  # admin | atendente | comprador
     status: str  # ativo | bloqueado
     picture: str | None = None
+    mfa_enabled: bool = False
     created_at: datetime
 
 
@@ -38,6 +39,7 @@ class RegisterIn(AuthInput):
 class LoginIn(AuthInput):
     email: EmailStr
     password: str = Field(min_length=1, max_length=128)
+    mfa_code: str | None = Field(default=None, min_length=6, max_length=32)
 
 
 class ForgotPasswordIn(AuthInput):
@@ -47,6 +49,7 @@ class ForgotPasswordIn(AuthInput):
 class ResetPasswordIn(AuthInput):
     token: str = Field(min_length=32, max_length=200)
     new_password: str = Field(min_length=15, max_length=72)
+    mfa_code: str | None = Field(default=None, min_length=6, max_length=32)
 
     @field_validator('new_password')
     @classmethod
@@ -54,10 +57,60 @@ class ResetPasswordIn(AuthInput):
         return RegisterIn.password_bytes(value)
 
 
-class GoogleSessionIn(AuthInput):
-    session_id: str = Field(min_length=1, max_length=4096)
-
-
 class MessageOut(BaseModel):
     message: str
-    reset_token: str | None = None
+
+
+class PasswordChangeIn(AuthInput):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=15, max_length=72)
+    mfa_code: str | None = Field(default=None, min_length=6, max_length=32)
+
+    @field_validator('new_password')
+    @classmethod
+    def password_bytes(cls, value):
+        return RegisterIn.password_bytes(value)
+
+
+class MfaSetupIn(AuthInput):
+    current_password: str = Field(min_length=1, max_length=128)
+
+
+class MfaSetupOut(BaseModel):
+    secret: str
+    provisioning_uri: str
+    expires_in_seconds: int
+
+
+class MfaConfirmIn(AuthInput):
+    current_password: str = Field(min_length=1, max_length=128)
+    code: str = Field(min_length=6, max_length=8, pattern=r'^\d{6,8}$')
+
+
+class MfaConfirmOut(BaseModel):
+    recovery_codes: list[str]
+
+
+class MfaAdminRecoveryRequestOut(BaseModel):
+    recovery_token: str
+    expires_in_seconds: int
+
+
+class MfaAdminRecoverySetupIn(AuthInput):
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=128)
+    recovery_token: str = Field(min_length=32, max_length=200)
+
+
+class MfaAdminRecoveryCompleteIn(MfaAdminRecoverySetupIn):
+    code: str = Field(min_length=6, max_length=8, pattern=r'^\d{6,8}$')
+
+
+class MfaDisableIn(AuthInput):
+    current_password: str = Field(min_length=1, max_length=128)
+    code: str = Field(min_length=6, max_length=32)
+
+
+class ReauthenticateIn(AuthInput):
+    password: str = Field(min_length=1, max_length=128)
+    mfa_code: str | None = Field(default=None, min_length=6, max_length=32)

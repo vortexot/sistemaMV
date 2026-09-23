@@ -13,13 +13,13 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from lib.db import db
-from lib.security import require_roles
+from lib.security import require_recent_auth
 from models.files import FileOut
 
 router = APIRouter(prefix="/files")
 
 STORAGE_DIR = Path(
-    os.environ.get("STORAGE_DIR", Path(__file__).resolve().parent.parent / "storage" / "uploads")
+    os.environ.get("STORAGE_DIR") or Path(__file__).resolve().parent.parent / "storage" / "uploads"
 )
 MAX_SIZE = 8 * 1024 * 1024  # 8 MB
 ALLOWED_MIME = {"image/jpeg", "image/png", "image/webp", "image/gif"}
@@ -35,7 +35,7 @@ EXT_BY_MIME = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp",
 
 
 @router.post("/upload", response_model=FileOut)
-async def upload_file(file: UploadFile, user: dict = Depends(require_roles("admin"))) -> FileOut:
+async def upload_file(file: UploadFile, user: dict = Depends(require_recent_auth("admin"))) -> FileOut:
     data = await file.read(MAX_SIZE + 1)
     if not data:
         raise HTTPException(status_code=422, detail="Arquivo vazio.")
@@ -108,11 +108,7 @@ async def get_file(file_id: str):
         {
             "id": file_id,
             "is_deleted": False,
-            # Records created before classification are all admin-uploaded catalog images.
-            "$or": [
-                {"access": "public_asset"},
-                {"access": {"$exists": False}},
-            ],
+            "access": "public_asset",
         },
         {"_id": 0},
     )

@@ -1,5 +1,6 @@
 """Isolated endpoint tests: real validation/RBAC, no live database writes."""
 import os
+import time
 from io import BytesIO
 from types import SimpleNamespace
 
@@ -7,7 +8,7 @@ os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017")
 os.environ.setdefault("DB_NAME", "indoor_tests")
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from PIL import Image
 from lib.security import get_current_user
@@ -57,7 +58,10 @@ def indoor(monkeypatch, tmp_path):
     app = FastAPI()
     for router in (admin.router, catalog.router, files.router):
         app.include_router(router, prefix="/api")
-    app.dependency_overrides[get_current_user] = lambda: {"id": "admin", "role": "admin"}
+    async def current_user(request: Request):
+        request.state.auth_payload = {"reauth_at": int(time.time()), "mfa": False}
+        return {"id": "admin", "role": "admin", "mfa_enabled": False}
+    app.dependency_overrides[get_current_user] = current_user
     with TestClient(app) as client:
         yield client, app, database
 

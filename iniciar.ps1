@@ -37,7 +37,7 @@ if (!(Test-LocalPort 8001)) {
             & $uvExe venv --python 3.12 .venv
             if ($LASTEXITCODE -ne 0) { throw 'Falha ao preparar Python.' }
         }
-        & $uvExe pip install --python $pythonExe -r requirements.txt
+        & $uvExe pip install --python $pythonExe --require-hashes -r requirements.lock
         if ($LASTEXITCODE -ne 0) { throw 'Falha ao instalar dependencias.' }
         Start-Process -FilePath $pythonExe -WorkingDirectory (Get-Location).Path -ArgumentList @('-m', 'uvicorn', 'server:app', '--host', '127.0.0.1', '--port', '8001') -RedirectStandardOutput (Join-Path $localDir 'backend.log') -RedirectStandardError (Join-Path $localDir 'backend-error.log') -WindowStyle Hidden | Out-Null
     } finally { Pop-Location }
@@ -49,7 +49,6 @@ if (!(Test-LocalPort 3000)) {
     $frontendDir = Join-Path $projectRoot 'frontend'
     $viteScript = Join-Path $frontendDir 'node_modules\vite\bin\vite.js'
     $env:DISABLE_VISUAL_EDITS = 'true'
-    $env:DISABLE_EMERGENT_OVERLAY = 'true'
     Start-Process -FilePath $nodeExe -WorkingDirectory $frontendDir -ArgumentList @("`"$viteScript`"", '--host', '127.0.0.1', '--port', '3000', '--strictPort') -RedirectStandardOutput (Join-Path $localDir 'frontend.log') -RedirectStandardError (Join-Path $localDir 'frontend-error.log') -WindowStyle Hidden | Out-Null
     Wait-LocalPort 3000 'Frontend'
 }

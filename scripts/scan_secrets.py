@@ -2,6 +2,7 @@
 import json
 import re
 import subprocess
+import tarfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -9,6 +10,7 @@ PATTERNS = {
     'private_key': re.compile(r'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'),
     'provider_token': re.compile(r'\b(?:gh[pousr]_[A-Za-z0-9]{30,}|sk-(?:proj-)?[A-Za-z0-9_-]{25,}|AKIA[A-Z0-9]{16})\b'),
     'jwt': re.compile(r'\beyJ[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{12,}\.[A-Za-z0-9_-]{12,}\b'),
+    'literal_password': re.compile(r'''(?im)["']?(?:password|senha)["']?[ \t]*[:=][ \t]*["']([^"'\r\n]{8,})["']'''),
     'literal_credential': re.compile(
         r'''(?im)(?:JWT_SECRET|PAYPAL_CLIENT_SECRET|SUPABASE_DB_URL|SUPABASE_SERVICE_ROLE_KEY|'''
         r'''BOOTSTRAP_ADMIN_HASH|RESET_WEBHOOK_TOKEN|DATABASE_URL)[ \t]*["']?[ \t]*[:=][ \t]*'''
@@ -21,7 +23,7 @@ findings = []
 def scan(text, location, scope):
     for kind, pattern in PATTERNS.items():
         for match in pattern.finditer(text):
-            value = match.group(1) if kind == 'literal_credential' else match.group()
+            value = match.group(1) if kind in {'literal_credential', 'literal_password'} else match.group()
             if (
                 value in {'undefined', 'password', 'string', 'input.password', 'data.password', 'synthetic'}
                 or '<password>' in value
@@ -54,6 +56,26 @@ for raw_path in paths:
     count += 1
     scan(data.decode('utf-8', 'replace'), relative, 'working-tree')
 
+# Ignored deployment secrets, generated bundles, logs and archived releases are also in scope.
+# Findings in server-side configuration are an inventory, not proof of public disclosure.
+extra = set()
+for folder in ('backend', 'frontend'):
+    extra.update((ROOT / folder).glob('.env*'))
+extra.update((ROOT / 'frontend/dist').rglob('*.js'))
+extra.update((ROOT / 'frontend/dist').rglob('*.map'))
+extra.update((ROOT / '.local').glob('*.log'))
+extra.update((ROOT / 'memory').glob('*credentials*'))
+extra.update((ROOT / '.local/sites-preparation').glob('acesso*.txt'))
+for path in sorted(extra):
+    if path.is_file() and path.stat().st_size <= 10_000_000:
+        count += 1
+        scan(path.read_text(encoding='utf-8', errors='replace'), str(path.relative_to(ROOT)), 'ignored-local')
+for path in (ROOT / '.local/sites-preparation').glob('mv-*.tar.gz'):
+    with tarfile.open(path) as archive:
+        for member in archive:
+            if member.isfile() and member.size <= 5_000_000 and member.name.endswith(('.js', '.map', '.env', '.txt')):
+                scan(archive.extractfile(member).read().decode('utf-8', 'replace'), str(path.relative_to(ROOT))+':'+member.name, 'archived-release')
+
 history_count = 0
 for row in git('rev-list', '--objects', '--all').decode().splitlines():
     oid, _, name = row.partition(' ')
@@ -68,6 +90,7 @@ for row in git('rev-list', '--objects', '--all').decode().splitlines():
 
 report = {'tool': 'local heuristic scanner (not a complete secret detector)', 'working_files': count,
           'git_blobs': history_count, 'root_git_history': 'scanned', 'findings': findings}
-target = ROOT / 'docs/security/secret-scan.json'
+target = ROOT / '.local/security/secret-scan.json'
+target.parent.mkdir(parents=True, exist_ok=True)
 target.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
 print(json.dumps({'files': count, 'git_blobs': history_count, 'candidates': len(findings), 'report': str(target.relative_to(ROOT))}))

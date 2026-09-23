@@ -92,3 +92,15 @@ async def capture_order(paypal_order_id: str, *, request_id: str) -> dict:
         )
         resp.raise_for_status()
         return resp.json()
+
+
+async def get_order(paypal_order_id: str) -> dict:
+    """Read PayPal's current order state without creating or capturing a payment."""
+    async with httpx.AsyncClient(timeout=30) as client:
+        token = await _access_token(client)
+        resp = await client.get(
+            f"{api_base()}/v2/checkout/orders/{quote(paypal_order_id, safe='')}",
+            headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        )
+        resp.raise_for_status()
+        return resp.json()
