@@ -3,6 +3,7 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PORT=8000 \
+    STORAGE_BACKEND=filesystem \
     STORAGE_DIR=/data/uploads
 
 WORKDIR /app

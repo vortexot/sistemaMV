@@ -14,6 +14,7 @@ def _production(monkeypatch):
         "PUBLIC_ORIGIN": "https://loja.example",
         "CORS_ORIGINS": "https://loja.example",
         "FORWARDED_ALLOW_IPS": "10.0.0.0/24",
+        "STORAGE_BACKEND": "filesystem",
         "STORAGE_PERSISTENT": "true",
         'STORAGE_DIR': str(Path.cwd() / 'storage'),
         "GOOGLE_AUTH_ENABLED": "false",
@@ -59,6 +60,7 @@ def test_proxy_wildcard_is_rejected_outside_render_web_service(monkeypatch, serv
         ('FORWARDED_ALLOW_IPS', '::/0'),
         ('STORAGE_DIR', ''),
         ('STORAGE_DIR', 'relative/uploads'),
+        ('STORAGE_BACKEND', 'memory'),
         ('CORS_ORIGINS', 'https://loja.example,*'),
         ('PUBLIC_ORIGIN', 'https://loja.example:invalid'),
         ("STORAGE_PERSISTENT", "false"),
@@ -86,3 +88,10 @@ def test_staging_rejects_live_paypal(monkeypatch):
     monkeypatch.setenv('PAYPAL_CLIENT_SECRET', 'synthetic-secret')
     with pytest.raises(RuntimeError, match='staging can only use'):
         validate_production_config()
+
+
+def test_gridfs_storage_does_not_require_filesystem_path(monkeypatch):
+    _production(monkeypatch)
+    monkeypatch.setenv("STORAGE_BACKEND", "gridfs")
+    monkeypatch.delenv("STORAGE_DIR")
+    validate_production_config()

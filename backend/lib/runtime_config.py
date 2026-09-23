@@ -82,9 +82,14 @@ def validate_production_config() -> None:
         problems.append("CORS_ORIGINS must include PUBLIC_ORIGIN")
     if not _trusted_proxy_list(os.getenv("FORWARDED_ALLOW_IPS", "")):
         problems.append("FORWARDED_ALLOW_IPS must contain trusted proxy CIDRs, or * only on a Render web service")
+    storage_backend = os.getenv("STORAGE_BACKEND", "filesystem").strip().lower()
+    if storage_backend not in {"filesystem", "gridfs"}:
+        problems.append("STORAGE_BACKEND must be filesystem or gridfs")
     if os.getenv("STORAGE_PERSISTENT") != "true":
-        problems.append("STORAGE_PERSISTENT=true is required after mounting durable upload storage")
-    if not os.getenv('STORAGE_DIR') or not Path(os.environ['STORAGE_DIR']).is_absolute():
+        problems.append("STORAGE_PERSISTENT=true is required for durable upload storage")
+    if storage_backend == "filesystem" and (
+        not os.getenv('STORAGE_DIR') or not Path(os.environ['STORAGE_DIR']).is_absolute()
+    ):
         problems.append('STORAGE_DIR must be an absolute path to durable upload storage')
     if os.getenv("GOOGLE_AUTH_ENABLED", "false") != "false":
         problems.append("legacy GOOGLE_AUTH_ENABLED must remain false")

@@ -6,7 +6,7 @@ painel administrativo e apresentação de mídia para a loja física.
 ## Arquitetura
 
 - `frontend/`: Vite, React 19, TypeScript e Tailwind CSS.
-- `backend/`: FastAPI, MongoDB e armazenamento de imagens em volume persistente.
+- `backend/`: FastAPI, MongoDB e armazenamento de imagens em volume persistente ou GridFS.
 - `tests/`: testes de navegador com Playwright.
 - `frontend/vercel.ts`: build do frontend, cabeçalhos HTTP, fallback da SPA e proxy `/api`.
 
@@ -45,8 +45,9 @@ Variáveis principais estão documentadas em `backend/.env.example`.
 - `PUBLIC_ORIGIN`: origem HTTPS pública exata.
 - `CORS_ORIGINS`: lista de origens HTTPS confiáveis, sem curingas.
 - `FORWARDED_ALLOW_IPS`: IPs ou CIDRs dos proxies que realmente chegam ao Uvicorn.
-- `STORAGE_DIR`: caminho do volume persistente de uploads.
-- `STORAGE_PERSISTENT=true`: confirmação explícita de que o volume é durável.
+- `STORAGE_BACKEND`: `filesystem` para volume persistente ou `gridfs` para armazenar os bytes no MongoDB.
+- `STORAGE_DIR`: caminho absoluto do volume quando `STORAGE_BACKEND=filesystem`.
+- `STORAGE_PERSISTENT=true`: confirmação explícita de que o backend escolhido é durável.
 - `PAYMENTS_PAUSED`: mantenha `true` até validar as credenciais e o fluxo PayPal.
 - `PAYPAL_MODE`, `PAYPAL_CLIENT_ID` e `PAYPAL_CLIENT_SECRET`: configuração PayPal.
 - `RESET_WEBHOOK_URL`, `RESET_WEBHOOK_TOKEN` e `RESET_WEBHOOK_ALLOWED_HOSTS`:
@@ -58,7 +59,7 @@ e nunca devem conter chaves, tokens, senhas ou strings de conexão.
 ## Frontend na Vercel
 
 O frontend pode ser publicado na Vercel depois que o backend estiver disponível
-em outra hospedagem HTTPS com MongoDB e armazenamento persistentes. Configure:
+em outra hospedagem HTTPS com MongoDB e armazenamento persistente. Configure:
 
 - `BACKEND_ORIGIN`: origem HTTPS externa do FastAPI, sem `/api` e sem barra final.
 - `VITE_SITE_URL`: URL pública final do site.
@@ -68,11 +69,15 @@ em outra hospedagem HTTPS com MongoDB e armazenamento persistentes. Configure:
 `frontend/vercel.ts` bloqueia a configuração quando `BACKEND_ORIGIN` está ausente ou não é
 uma origem HTTPS válida. O backend, o MongoDB e uploads não são executados na
 Vercel por esta configuração. O armazenamento local efêmero de funções serverless
-não atende aos uploads deste sistema.
+não atende aos uploads deste sistema. No staging gratuito do Render, use
+`STORAGE_BACKEND=gridfs`; assim as imagens permanecem no Atlas quando a instância
+dorme ou é substituída.
 
 No backend de produção, configure um proxy confiável para substituir cabeçalhos
 de encaminhamento e iniciar o Uvicorn com `--proxy-headers` e uma allowlist exata
-em `--forwarded-allow-ips`. Não exponha a origem diretamente nem use `*`.
+em `--forwarded-allow-ips`. O Blueprint do Render usa `*` porque a plataforma
+identifica o processo como web service e controla o caminho até o container; a
+validação do backend recusa esse valor fora desse contexto.
 
 ## Uploads legados
 

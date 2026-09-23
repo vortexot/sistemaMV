@@ -6,6 +6,7 @@ import os
 import uuid
 import time
 from datetime import timedelta
+from io import BytesIO
 from types import SimpleNamespace
 
 import httpx
@@ -14,6 +15,7 @@ import pyotp
 import pytest
 from cryptography.fernet import Fernet
 from motor.motor_asyncio import AsyncIOMotorClient
+from PIL import Image
 from lib import db as database_module, security, mfa, audit as audit_module
 from lib.dates import utcnow
 from routers import auth, admin, orders, files, favorites, catalog
@@ -560,6 +562,38 @@ async def test_storage_path_cannot_escape(secure, tmp_path, monkeypatch):
     await secure.db.files.insert_one({'id': 'outside', 'is_deleted': False, 'access': 'public_asset', 'storage_path': str(outside), 'content_type': 'image/png'})
     response = await secure.api.get('/api/files/outside')
     assert response.status_code == 404 and 'SENSITIVE-MARKER' not in response.text
+
+
+async def test_gridfs_upload_persists_serves_and_deduplicates(secure, monkeypatch):
+    monkeypatch.setenv('STORAGE_BACKEND', 'gridfs')
+    image = BytesIO()
+    Image.new('RGB', (32, 18), color=(18, 52, 86)).save(image, format='PNG')
+    data = image.getvalue()
+
+    first = await secure.api.post(
+        '/api/files/upload',
+        files={'file': ('staging.png', data, 'image/png')},
+        headers=secure.headers('admin'),
+    )
+    second = await secure.api.post(
+        '/api/files/upload',
+        files={'file': ('same-content.png', data, 'image/png')},
+        headers=secure.headers('admin'),
+    )
+
+    assert first.status_code == 200 and second.status_code == 200
+    assert second.json()['id'] == first.json()['id']
+    doc = await secure.db.files.find_one({'id': first.json()['id']}, {'_id': 0})
+    assert doc['storage_backend'] == 'gridfs'
+    assert doc['storage_key'] == doc['id']
+    assert doc['storage_path'] == f"gridfs://uploads/{doc['id']}"
+    assert await secure.db['uploads.files'].count_documents({}) == 1
+
+    response = await secure.api.get(f"/api/files/{doc['id']}")
+    assert response.status_code == 200 and response.content == data
+    assert response.headers['content-type'] == 'image/png'
+    assert response.headers['cache-control'] == 'public, max-age=31536000, immutable'
+    assert response.headers['x-content-type-options'] == 'nosniff'
 
 
 async def test_private_file_is_never_served_by_public_asset_route(secure, tmp_path, monkeypatch):

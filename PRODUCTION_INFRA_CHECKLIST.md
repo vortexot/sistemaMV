@@ -22,9 +22,9 @@ Use primeiro em staging. Registre evidência, responsável e data em cada item. 
 
 ## Storage
 
-- [ ] `STORAGE_DIR` é caminho absoluto em volume persistente; `STORAGE_PERSISTENT=true` somente depois de comprovar isso.
+- [ ] `STORAGE_BACKEND=filesystem` usa `STORAGE_DIR` absoluto em volume persistente, ou `STORAGE_BACKEND=gridfs` usa o MongoDB autorizado; `STORAGE_PERSISTENT=true` somente depois de comprovar a durabilidade.
 - [ ] Upload permanece após reinício/substituição da instância.
-- [ ] Permissões do volume impedem leitura por serviços não autorizados.
+- [ ] Permissões do volume ou do usuário MongoDB impedem leitura por serviços não autorizados.
 - [ ] Snapshot do banco e arquivos pertence à mesma janela consistente.
 
 ## Secrets, logs e alertas

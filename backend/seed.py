@@ -9,7 +9,6 @@ import asyncio
 import os
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 
 import httpx
 
@@ -17,7 +16,7 @@ from lib.db import db, ensure_indexes
 from lib.dates import utcnow
 from lib.security import hash_password
 
-from routers.files import STORAGE_DIR
+from routers.files import delete_stored_bytes, store_bytes, stored_file_exists
 
 IMAGES = {
     "hero": "https://images.unsplash.com/photo-1559697242-a465f2578a95?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzN8MHwxfHNlYXJjaHwyfHxzdHJlZXR3ZWFyJTIwbHV4dXJ5JTIwbW9kZWx8ZW58MHx8fHwxNzg5NDIxNDg0fDA&ixlib=rb-4.1.0&q=85",
@@ -71,7 +70,7 @@ EXT_BY_MIME = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp",
 async def save_seed_image(key: str, url: str) -> str | None:
     """Download once per seed key; reuse the stored file_id on re-runs."""
     existing = await db.files.find_one({"seed_key": key}, {"_id": 0})
-    if existing:
+    if existing and await stored_file_exists(db, existing):
         return existing["id"]
     try:
         async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
@@ -83,24 +82,29 @@ async def save_seed_image(key: str, url: str) -> str | None:
     data = resp.content
     ctype = (resp.headers.get("content-type") or "image/jpeg").split(";")[0].strip().lower()
     ext = EXT_BY_MIME.get(ctype, ".jpg")
-    file_id = str(uuid.uuid4())
-    STORAGE_DIR.mkdir(parents=True, exist_ok=True)
-    path = STORAGE_DIR / f"{file_id}{ext}"
-    path.write_bytes(data)
-    await db.files.insert_one(
-        {
-            "id": file_id,
-            "storage_path": str(path),
-            "original_filename": f"{key}{ext}",
-            "content_type": EXT_BY_MIME.get(ext, "image/jpeg"),
-            "size": len(data),
-            "uploaded_by": "seed",
-            "access": "public_asset",
-            "created_at": utcnow(),
-            "is_deleted": False,
-            "seed_key": key,
-        }
-    )
+    file_id = existing["id"] if existing else str(uuid.uuid4())
+    content_type = ctype if ctype in EXT_BY_MIME else "image/jpeg"
+    storage = await store_bytes(db, file_id, ext, data, content_type=content_type)
+    doc = {
+        "id": file_id,
+        **storage,
+        "original_filename": f"{key}{ext}",
+        "content_type": content_type,
+        "size": len(data),
+        "uploaded_by": "seed",
+        "access": "public_asset",
+        "created_at": existing.get("created_at", utcnow()) if existing else utcnow(),
+        "is_deleted": False,
+        "seed_key": key,
+    }
+    try:
+        if existing:
+            await db.files.replace_one({"id": file_id}, doc)
+        else:
+            await db.files.insert_one(doc)
+    except BaseException:
+        await delete_stored_bytes(db, storage)
+        raise
     print(f"  · imagem {key} salva ({len(data) // 1024} KB)")
     return file_id
 

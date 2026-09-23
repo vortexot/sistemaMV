@@ -1,6 +1,7 @@
 """File upload models. storage_path never leaves the backend."""
 
 from datetime import datetime
+import uuid
 
 from pydantic import BaseModel, Field
 
