@@ -57,7 +57,7 @@ Rate limit: dez logins inválidos retornaram `401`; a 11ª tentativa do mesmo pa
 
 Arquivos sensíveis: requests reais a `.env`, `.git/config`, `backend/.env`, `vercel.json` e `render.yaml` retornaram `404` sem conteúdo sensível.
 
-O scan mais recente cobriu 205 arquivos e 342 blobs Git. Os 31 candidatos são literais sintéticos de testes atuais/históricos e dois valores no `backend/.env` local ignorado. Valores reais não foram adicionados ao Git. A URL Supabase legada e não usada deve ser rotacionada antes de qualquer reutilização.
+O scan final cobriu 205 arquivos e todo o histórico Git existente. Os 31 candidatos são literais sintéticos de testes atuais/históricos e dois valores no `backend/.env` local ignorado. Valores reais não foram adicionados ao Git. A URL Supabase legada e não usada deve ser rotacionada antes de qualquer reutilização.
 
 ## Testes
 
