@@ -5,9 +5,9 @@ Atualizado em 2026-09-23. Este documento não contém credenciais, tokens, conne
 ## Deploy
 
 Frontend: preparado para Vercel por `vercel.ts`; publicação bloqueada por autenticação externa.
-Backend: FastAPI empacotado em `backend/Dockerfile`; provedor compatível com processo persistente e volume ainda precisa ser escolhido.
-Banco: MongoDB remoto isolado ainda não provisionado.
-Storage: diretório persistente isolado ainda não provisionado.
+Backend: FastAPI empacotado em `backend/Dockerfile`; Render escolhido e Blueprint preparado em `render.yaml`.
+Banco: MongoDB Atlas escolhido; cluster remoto isolado ainda não provisionado.
+Storage: volume persistente Render de 1 GB definido, ainda não provisionado.
 URL frontend: pendente.
 URL API: pendente.
 Commit: tag local `pre-staging-final-2026-09-23` (criada após os gates locais).
@@ -19,9 +19,9 @@ Arquitetura confirmada: React/Vite no frontend, FastAPI/Uvicorn no backend, Mong
 
 HTTPS: pendente de URLs remotas.
 CORS: validação fail-closed implementada; origens exatas dependem da URL da Vercel.
-Proxy: `FORWARDED_ALLOW_IPS` obrigatório e sem `*`; CIDRs dependem do provedor do backend.
+Proxy: Render encerra TLS e é o único caminho até a porta do container. `*` é aceito somente quando `RENDER=true` e `RENDER_SERVICE_TYPE=web`; fora desse contexto o startup falha.
 Banco privado: pendente de provedor/conta externa.
-Storage persistente: imagem preparada para `/data/uploads`; volume remoto dedicado pendente.
+Storage persistente: imagem preparada para `/data/uploads`; Blueprint define volume dedicado em `/data`, pendente de criação.
 Secrets: inventário abaixo; nenhum secret será enviado ao frontend ou ao Git.
 Logs: auditoria estruturada e redação validadas localmente; destino remoto pendente.
 Alertas: AÇÃO DO RESPONSÁVEL — escolher coletor antes de conectar `security.alert`.
@@ -47,11 +47,11 @@ Uploads: validações locais aprovadas; persistência e comportamento remoto pen
 Rate limit: implementado; comportamento atrás do proxy remoto pendente.
 Arquivos sensíveis: exclusões locais configuradas; requests reais pendentes.
 
-O scan executado antes de qualquer push cobriu 204 arquivos atuais e 315 blobs Git. Foram encontrados 25 candidatos: 23 literais sintéticos em testes atuais/históricos, sem ação; e 2 possíveis credenciais no `backend/.env` local ignorado. Esses valores não estão no commit e não serão copiados para staging. Se já tiverem sido usados ou distribuídos, devem ser rotacionados antes de qualquer reutilização.
+O scan executado antes de qualquer push cobriu 205 arquivos atuais e 319 blobs Git. Foram encontrados 25 candidatos: 23 literais sintéticos em testes atuais/históricos, sem ação; e 2 possíveis credenciais no `backend/.env` local ignorado. Esses valores não estão no commit e não serão copiados para staging. Se já tiverem sido usados ou distribuídos, devem ser rotacionados antes de qualquer reutilização.
 
 ## Testes
 
-Backend: 69 aprovados.
+Backend: 73 aprovados.
 Frontend: coberto pelo E2E e build.
 Playwright/E2E: 28 aprovados.
 Lint: aprovado, 0 erros e 6 avisos existentes.
@@ -80,8 +80,8 @@ RTO: não medido.
 ## Pendências
 
 - Autenticar a conta Vercel que hospedará o frontend de STAGING.
-- Escolher/provisionar um provedor de backend com processo persistente e volume durável, sem contratação paga automática.
-- Criar MongoDB remoto exclusivo de staging com TLS, autenticação, transações e backup.
+- Autorizar a criação do serviço Render pago mínimo e do volume persistente após revisar a cobrança mostrada pelo provedor.
+- Criar MongoDB Atlas exclusivo de staging com TLS, autenticação, transações e acesso restrito aos IPs de saída do Render.
 - Configurar secrets exclusivos, URLs reais, CORS e proxy após os endpoints existirem.
 - Provisionar contas e dados exclusivamente sintéticos, executar smoke tests externos e validar logs.
 - Configurar e testar PayPal Sandbox somente após autorização para despausar temporariamente staging.
@@ -90,12 +90,12 @@ RTO: não medido.
 ## Checklist final
 
 - ❌ Frontend staging — autenticação Vercel pendente.
-- ❌ Backend staging — provedor pendente.
-- ❌ Banco staging — provedor pendente.
-- ❌ Storage staging — volume dedicado pendente.
+- ❌ Backend staging — Blueprint Render pronto; login e criação pendentes.
+- ❌ Banco staging — Atlas escolhido; login e criação pendentes.
+- ❌ Storage staging — volume Render definido; criação paga pendente.
 - ⚠️ HTTPS — configuração pronta, validação remota pendente.
 - ⚠️ CORS — implementação pronta, URLs pendentes.
-- ⚠️ Trusted proxy — proteção pronta, CIDRs pendentes.
+- ⚠️ Trusted proxy — configuração específica do Render aprovada localmente; validação remota pendente.
 - ⚠️ Secrets — inventário pronto, criação externa pendente.
 - ⚠️ Headers — configuração pronta, validação remota pendente.
 - ⚠️ Cookies — implementação pronta, validação remota pendente.

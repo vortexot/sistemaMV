@@ -31,6 +31,24 @@ def test_safe_production_configuration(monkeypatch):
     assert cors_origins() == ["https://loja.example"]
 
 
+def test_render_web_service_accepts_platform_proxy(monkeypatch):
+    _production(monkeypatch)
+    monkeypatch.setenv("FORWARDED_ALLOW_IPS", "*")
+    monkeypatch.setenv("RENDER", "true")
+    monkeypatch.setenv("RENDER_SERVICE_TYPE", "web")
+    validate_production_config()
+
+
+@pytest.mark.parametrize("service_type", ["worker", "pserv", ""])
+def test_proxy_wildcard_is_rejected_outside_render_web_service(monkeypatch, service_type):
+    _production(monkeypatch)
+    monkeypatch.setenv("FORWARDED_ALLOW_IPS", "*")
+    monkeypatch.setenv("RENDER", "true")
+    monkeypatch.setenv("RENDER_SERVICE_TYPE", service_type)
+    with pytest.raises(RuntimeError, match="Unsafe production configuration"):
+        validate_production_config()
+
+
 @pytest.mark.parametrize(
     ("key", "value"),
     [

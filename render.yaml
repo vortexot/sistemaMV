@@ -1,0 +1,51 @@
+services:
+  - type: web
+    name: mv-multimarcas-api-staging
+    runtime: docker
+    repo: https://github.com/vortexot/sistemaMV.git
+    branch: main
+    region: virginia
+    plan: 0.5c-512mb
+    numInstances: 1
+    autoDeployTrigger: "off"
+    previews:
+      generation: manual
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/
+    maxShutdownDelaySeconds: 30
+    disk:
+      name: staging-uploads
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: APP_ENV
+        value: staging
+      - key: DB_NAME
+        value: mv_multimarcas_staging
+      - key: MONGO_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: MFA_ENCRYPTION_KEY
+        sync: false
+      - key: MFA_REQUIRED
+        value: "true"
+      - key: PUBLIC_ORIGIN
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: FORWARDED_ALLOW_IPS
+        value: "*"
+      - key: STORAGE_DIR
+        value: /data/uploads
+      - key: STORAGE_PERSISTENT
+        value: "true"
+      - key: PAYMENTS_PAUSED
+        value: "true"
+      - key: PAYPAL_MODE
+        value: sandbox
+      - key: GOOGLE_AUTH_ENABLED
+        value: "false"

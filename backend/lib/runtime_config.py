@@ -35,7 +35,12 @@ def _https_origin(value: str) -> bool:
 
 
 def _trusted_proxy_list(value: str) -> bool:
-    if not value or value.strip() == "*":
+    value = value.strip()
+    if value == "*":
+        # Render's public port is reachable only through its edge proxy and the
+        # platform documents FORWARDED_ALLOW_IPS=* for Python services.
+        return os.getenv("RENDER") == "true" and os.getenv("RENDER_SERVICE_TYPE") == "web"
+    if not value:
         return False
     try:
         for item in value.split(","):
@@ -76,7 +81,7 @@ def validate_production_config() -> None:
     elif public_origin not in origins:
         problems.append("CORS_ORIGINS must include PUBLIC_ORIGIN")
     if not _trusted_proxy_list(os.getenv("FORWARDED_ALLOW_IPS", "")):
-        problems.append("FORWARDED_ALLOW_IPS must contain trusted proxy IPs/CIDRs and cannot be *")
+        problems.append("FORWARDED_ALLOW_IPS must contain trusted proxy CIDRs, or * only on a Render web service")
     if os.getenv("STORAGE_PERSISTENT") != "true":
         problems.append("STORAGE_PERSISTENT=true is required after mounting durable upload storage")
     if not os.getenv('STORAGE_DIR') or not Path(os.environ['STORAGE_DIR']).is_absolute():
