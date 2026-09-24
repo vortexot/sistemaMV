@@ -8,9 +8,11 @@ import argparse
 import asyncio
 import os
 import uuid
+from io import BytesIO
 from datetime import datetime, timezone
 
 import httpx
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from lib.db import db, ensure_indexes
 from lib.dates import utcnow
@@ -32,6 +34,10 @@ IMAGES = {
     "p-pace-pro": "https://images.unsplash.com/photo-1559050993-d4e4fbf11769?crop=entropy&cs=srgb&fm=jpg&ixid=M3w0NjY2NzN8MHwxfHNlYXJjaHwzfHxsdXh1cnklMjBzbmVha2VycyUyMHByb2R1Y3QlMjBwaG90b2dyYXBoeXxlbnwwfHx8fDE3ODk0MjE2Njl8MA&ixlib=rb-4.1.0&q=85",
     "p-court-luxe": "https://images.unsplash.com/photo-1560769629-975ec94e6a86?crop=entropy&cs=srgb&fm=jpg&ixid=M3w0NjY2NzN8MHwxfHNlYXJjaHwxfHxsdXh1cnklMjBzbmVha2VycyUyMHByb2R1Y3QlMjBwaG90b2dyYXBoeXxlbnwwfHx8fDE3ODk0MjE2Njl8MA&ixlib=rb-4.1.0&q=85",
     "p-shadow": "https://images.unsplash.com/photo-1646191152321-673e8b541cb8?crop=entropy&cs=srgb&fm=jpg&ixid=M3wzNDQ2NDN8MHwxfHNlYXJjaHw0fHxhdGhsZXRpYyUyMHNwb3J0c3dlYXIlMjBtb2RlbCUyMGRhcmt8ZW58MHx8fHwxNzg5NDIxNjY5fDA&ixlib=rb-4.1.0&q=85",
+    "p-velocity-shirt": "https://images.unsplash.com/photo-1666358057084-5f63d94d6958?auto=format&fit=crop&w=1200&q=82",
+    "p-shadow-hoodie": "https://images.unsplash.com/photo-1499972777470-6a932ea55420?auto=format&fit=crop&w=1200&q=82",
+    "p-crown-cap": "https://images.unsplash.com/photo-1557225451-b03ada84e645?auto=format&fit=crop&w=1200&q=82",
+    "p-essential-shirt": "https://images.unsplash.com/photo-1618354691373-d851c5c3a990?auto=format&fit=crop&w=1200&q=82",
 }
 
 # Accounts must be provisioned explicitly; seeds never create shared/default credentials.
@@ -47,25 +53,22 @@ CATEGORIES = [
 ]
 
 PRODUCTS = [
-    {"sku": "GS-CAM-001", "name": "Camisa Golden Velocity Pro", "brand": "Golden Pro", "cat": "camisas", "price": 189.90, "promo": 149.90, "stock": 24, "tag": "novo", "featured": True, "sizes": ["P", "M", "G", "GG"], "colors": ["Preto", "Dourado"], "desc": "Tecido técnico de compressão leve com detalhes dourados refletivos. Feita para ritmo intenso e presença urbana.", "img_key": "cat-camisas"},
+    {"sku": "GS-CAM-001", "name": "Camisa Golden Velocity Pro", "brand": "Golden Pro", "cat": "camisas", "price": 189.90, "promo": 149.90, "stock": 24, "tag": "novo", "featured": True, "sizes": ["P", "M", "G", "GG"], "colors": ["Preto", "Dourado"], "desc": "Tecido técnico de compressão leve com detalhes dourados refletivos. Feita para ritmo intenso e presença urbana.", "img_key": "p-velocity-shirt"},
     {"sku": "GS-MOL-002", "name": "Moletom Golden Blackout", "brand": "Golden Street", "cat": "moletons", "price": 349.90, "promo": None, "stock": 12, "tag": "mais_vendido", "featured": True, "sizes": ["P", "M", "G"], "colors": ["Preto"], "desc": "Felpa pesada 480g, capuz estruturado e bordado dourado. O moletom definitivo do streetwear premium.", "img_key": "p-blackout"},
     {"sku": "GS-TEN-003", "name": "Tênis Golden Pace Pro", "brand": "Golden Pro", "cat": "tenis", "price": 599.90, "promo": 499.90, "stock": 8, "tag": "oferta", "featured": True, "sizes": ["38", "39", "40", "41", "42"], "colors": ["Preto", "Branco"], "desc": "Entressola em espuma responsiva e cabedal premium. Velocidade com sofisticação.", "img_key": "p-pace-pro"},
     {"sku": "GS-CAL-004", "name": "Calça Golden Tech Cargo", "brand": "Golden Street", "cat": "calcas", "price": 279.90, "promo": None, "stock": 18, "tag": None, "featured": False, "sizes": ["38", "40", "42"], "colors": ["Preto", "Cinza"], "desc": "Tecido ripstop elástico com bolsos cargo utilitários e acabamento premium.", "img_key": "cat-calcas"},
     {"sku": "GS-SHO-005", "name": "Short Golden Sprint Elite", "brand": "Golden Pro", "cat": "shorts", "price": 129.90, "promo": None, "stock": 30, "tag": "novo", "featured": False, "sizes": ["P", "M", "G"], "colors": ["Preto"], "desc": "Leve, respirável e de secagem rápida. Feito para sprints na pista e na rua.", "img_key": "cat-shorts"},
-    {"sku": "GS-ACE-006", "name": "Boné Golden Crown", "brand": "Golden Core", "cat": "acessorios", "price": 89.90, "promo": None, "stock": 40, "tag": None, "featured": False, "sizes": ["Único"], "colors": ["Preto"], "desc": "Boné strapback em sar premium com logo dourado bordado em alto relevo.", "img_key": None},
-    {"sku": "GS-MOL-007", "name": "Moletom Golden Shadow Zip", "brand": "Golden Street", "cat": "moletons", "price": 389.90, "promo": 329.90, "stock": 3, "tag": "oferta", "featured": False, "sizes": ["M", "G", "GG"], "colors": ["Preto", "Chumbo"], "desc": "Zíper metálico dourado, forro térmico e silhueta oversize. Edição limitada.", "img_key": "p-shadow"},
+    {"sku": "GS-ACE-006", "name": "Boné Golden Crown", "brand": "Golden Core", "cat": "acessorios", "price": 89.90, "promo": None, "stock": 40, "tag": None, "featured": False, "sizes": ["Único"], "colors": ["Preto"], "desc": "Boné strapback em sar premium com logo dourado bordado em alto relevo.", "img_key": "p-crown-cap"},
+    {"sku": "GS-MOL-007", "name": "Moletom Golden Shadow Zip", "brand": "Golden Street", "cat": "moletons", "price": 389.90, "promo": 329.90, "stock": 3, "tag": "oferta", "featured": False, "sizes": ["M", "G", "GG"], "colors": ["Preto", "Chumbo"], "desc": "Zíper metálico dourado, forro térmico e silhueta oversize. Edição limitada.", "img_key": "p-shadow-hoodie"},
     {"sku": "GS-MOL-008", "name": "Moletom Golden Court", "brand": "Golden Core", "cat": "moletons", "price": 329.90, "promo": None, "stock": 0, "tag": None, "featured": False, "sizes": ["P", "M"], "colors": ["Preto"], "desc": "Clássico do basquete com gola careca e patch dourado. Reposição em breve.", "img_key": "p-court-hoodie"},
     {"sku": "GS-TEN-009", "name": "Tênis Court Luxe", "brand": "Golden Pro", "cat": "tenis", "price": 449.90, "promo": 399.90, "stock": 15, "tag": "oferta", "featured": False, "sizes": ["39", "40", "41"], "colors": ["Branco", "Dourado"], "desc": "Silhueta low-top em couro premium com detalhes dourados discretos.", "img_key": "p-court-luxe"},
-    {"sku": "GS-CAM-010", "name": "Camiseta Golden Essential", "brand": "Golden Core", "cat": "camisas", "price": 99.90, "promo": 79.90, "stock": 50, "tag": "mais_vendido", "featured": False, "sizes": ["P", "M", "G", "GG"], "colors": ["Preto", "Branco"], "desc": "Algodão penteado 30.1 com gola reforçada e selo dourado. A base de qualquer look.", "img_key": None},
+    {"sku": "GS-CAM-010", "name": "Camiseta Golden Essential", "brand": "Golden Core", "cat": "camisas", "price": 99.90, "promo": 79.90, "stock": 50, "tag": "mais_vendido", "featured": False, "sizes": ["P", "M", "G", "GG"], "colors": ["Preto", "Branco"], "desc": "Algodão penteado 30.1 com gola reforçada e selo dourado. A base de qualquer look.", "img_key": "p-essential-shirt"},
 ]
 
 BANNERS = [
     {"title": "Coleção Velocity", "subtitle": "Performance de elite com acabamento premium.", "img_key": "editorial", "active": True},
     {"title": "Golden Edition", "subtitle": "Peças de edição limitada com detalhes dourados.", "img_key": "p-shadow", "active": True},
 ]
-
-EXT_BY_MIME = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif"}
-
 
 async def save_seed_image(key: str, url: str) -> str | None:
     """Download once per seed key; reuse the stored file_id on re-runs."""
@@ -79,11 +82,19 @@ async def save_seed_image(key: str, url: str) -> str | None:
     except Exception as exc:  # offline pod: product just ships without an image (fallback UI covers it)
         print(f"  ! download falhou ({key}): {exc}")
         return None
-    data = resp.content
-    ctype = (resp.headers.get("content-type") or "image/jpeg").split(";")[0].strip().lower()
-    ext = EXT_BY_MIME.get(ctype, ".jpg")
+    try:
+        with Image.open(BytesIO(resp.content)) as source:
+            image = ImageOps.exif_transpose(source).convert("RGB")
+            image.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+            output = BytesIO()
+            image.save(output, "WEBP", quality=78, method=6, optimize=True)
+            data = output.getvalue()
+    except (UnidentifiedImageError, OSError) as exc:
+        print(f"  ! conversão falhou ({key}): {exc}")
+        return None
+    ext = ".webp"
     file_id = existing["id"] if existing else str(uuid.uuid4())
-    content_type = ctype if ctype in EXT_BY_MIME else "image/jpeg"
+    content_type = "image/webp"
     storage = await store_bytes(db, file_id, ext, data, content_type=content_type)
     doc = {
         "id": file_id,

@@ -21,17 +21,15 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import ProductCard from "@/components/shop/ProductCard";
 import EmptyState from "@/components/shop/EmptyState";
 import { FAQ_ITEMS } from "@/lib/site";
-import { catalogFileUrl } from "@/lib/assets";
+import { catalogFileUrl, publicAsset } from "@/lib/assets";
 
-const HERO_IMAGE_BASE = "https://images.unsplash.com/photo-1559697242-a465f2578a95";
-const HERO_IMAGE = `${HERO_IMAGE_BASE}?auto=format&fit=crop&w=1600&q=78`;
+const HERO_IMAGE = publicAsset("media/hero-1600.webp");
 const HERO_IMAGE_SRCSET = [640, 960, 1280, 1600, 1920]
-  .map((width) => `${HERO_IMAGE_BASE}?auto=format&fit=crop&w=${width}&q=78 ${width}w`)
+  .map((width) => `${publicAsset(`media/hero-${width}.webp`)} ${width}w`)
   .join(", ");
-const EDITORIAL_IMAGE_BASE = "https://images.unsplash.com/photo-1532332248682-206cc786359f";
-const EDITORIAL_IMAGE = `${EDITORIAL_IMAGE_BASE}?auto=format&fit=crop&w=1200&q=76`;
+const EDITORIAL_IMAGE = publicAsset("media/editorial-1200.webp");
 const EDITORIAL_IMAGE_SRCSET = [480, 768, 960, 1200]
-  .map((width) => `${EDITORIAL_IMAGE_BASE}?auto=format&fit=crop&w=${width}&q=76 ${width}w`)
+  .map((width) => `${publicAsset(`media/editorial-${width}.webp`)} ${width}w`)
   .join(", ");
 
 const MARQUEE_TEXT =

@@ -20,8 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
-const BRAND_IMAGE =
-  "https://images.unsplash.com/photo-1532332248682-206cc786359f?auto=format&fit=crop&w=1200&q=76";
+const BRAND_IMAGE = publicAsset("media/editorial-1200.webp");
 
 export default function Login() {
   const { user } = useSession();
