@@ -10,7 +10,7 @@ Backend: Render Free, serviço exclusivo `mv-multimarcas-api-staging`, publicado
 
 Banco e storage: projeto Atlas exclusivo `mv-multimarcas-staging-runtime`, cluster M0 `mv-staging` em AWS `US_EAST_1`, MongoDB 8.0.32, 0,5 GB e proteção contra encerramento ativa. Metadados e bytes de imagens ficam no Atlas; os bytes usam GridFS e não dependem do filesystem efêmero do Render.
 
-Implementação de referência: commit `39cc549`; tag anterior à implantação `pre-staging-final-2026-09-23`.
+Implementação de referência: commit `7f7ff1a`; tag anterior à implantação `pre-staging-final-2026-09-23`.
 
 Arquitetura validada: React/Vite na Vercel, proxy `/api` da Vercel para FastAPI/Uvicorn no Render, MongoDB Atlas com transações e GridFS, autenticação própria com cookies/JWT e MFA TOTP. PayPal permanece pausado.
 
@@ -69,6 +69,7 @@ O scan final cobriu 205 arquivos e todo o histórico Git existente. Os 31 candid
 - Smoke público: 10 produtos, seis categorias e imagens GridFS entregues pelo caminho Vercel → Render → Atlas.
 - Smoke desktop 1440×900 e mobile 390×844: título, header, catálogo e ausência de overflow horizontal aprovados em Chromium real.
 - Upload remoto: criação, deduplicação, content type, bytes, logout e persistência após restart aprovados.
+- Pentest externo controlado: 27 de 27 controles aprovados após corrigir e retestar o bypass do rate limit por cabeçalhos de proxy e desativar o schema OpenAPI público. Relatório completo em `EXTERNAL_PENTEST_REPORT.md`.
 
 ## PayPal
 
