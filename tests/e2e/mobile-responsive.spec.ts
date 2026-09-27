@@ -207,6 +207,35 @@ test("menu, quick view and form remain accessible on a narrow dynamic viewport",
   await expectNoPageOverflow(page);
 });
 
+test("gold accents and category actions stay visible on a full desktop viewport", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await stubPublicApi(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await expect(page.getByTestId("cinematic-hero")).toHaveAttribute("data-phase", "HERO_READY", { timeout: 15_000 });
+
+  const primaryCta = page.locator(".cinematic-primary");
+  await expect(primaryCta).toBeVisible();
+  await expect.poll(() => primaryCta.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(218, 165, 32)");
+
+  const categoryCards = page.locator('[data-testid^="category-card-"]');
+  await categoryCards.first().scrollIntoViewIfNeeded();
+  await expect(categoryCards).toHaveCount(6);
+  for (const card of await categoryCards.all()) {
+    const cardBox = await card.boundingBox();
+    const arrowBox = await card.locator(".editorial-category-arrow").boundingBox();
+    expect(arrowBox).not.toBeNull();
+    expect((arrowBox?.x ?? 0) + (arrowBox?.width ?? 0)).toBeLessThanOrEqual((cardBox?.x ?? 0) + (cardBox?.width ?? 0));
+    expect((arrowBox?.y ?? 0) + (arrowBox?.height ?? 0)).toBeLessThanOrEqual((cardBox?.y ?? 0) + (cardBox?.height ?? 0));
+  }
+
+  const lookbook = page.locator(".lookbook-section");
+  await lookbook.scrollIntoViewIfNeeded();
+  await expect.poll(() => lookbook.evaluate((element) => getComputedStyle(element).backgroundImage)).toContain("rgb(233, 226, 211)");
+  await expectNoPageOverflow(page);
+  await categoryCards.first().scrollIntoViewIfNeeded();
+});
+
 test("plain Home reload starts at the top without leaving history restoration disabled", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await stubPublicApi(page);

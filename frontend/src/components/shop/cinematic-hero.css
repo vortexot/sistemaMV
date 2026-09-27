@@ -14,8 +14,8 @@
 .cinematic-description { margin-top: 30px; max-width: 370px; font-size: 15px; line-height: 1.85; color: #ded9ce; }
 .cinematic-actions { display: flex; flex-wrap: wrap; gap: 28px; align-items: center; margin-top: 36px; }
 .cinematic-primary, .cinematic-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 20px; min-height: 52px; font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
-.cinematic-primary { padding: 0 24px; color: #181611; background: #d7b775; border: 1px solid #d7b775; transition: background .25s, box-shadow .25s; }
-.cinematic-primary:hover { background: #ebd3a0; box-shadow: 0 6px 26px rgb(215 183 117 / .18); }
+.cinematic-primary { padding: 0 24px; color: #0b0b0b; background: #daa520; border: 1px solid #daa520; transition: background .25s, border-color .25s, box-shadow .25s; }
+.cinematic-primary:hover { background: #efc445; border-color: #efc445; box-shadow: 0 6px 26px rgb(218 165 32 / .24); }
 .cinematic-primary svg { transition: transform .25s; }
 .cinematic-primary:hover svg { transform: translateX(3px); }
 .cinematic-secondary { color: #f3efe7; border-bottom: 1px solid #c6baa27a; transition: border-color .25s, color .25s; }
