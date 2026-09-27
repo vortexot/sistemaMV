@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PackageOpen, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 
-import { apiErrorMessage, apiGet, apiPatch } from "@/lib/api";
+import { apiErrorMessage, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { FULFILLMENT_METHOD_LABELS, ORDER_STATUS_LABELS, ORDER_STATUSES, type Order } from "@/lib/types";
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import EmptyState from "@/components/shop/EmptyState";
+import { Button } from "@/components/ui/button";
 
 const STATUS_BADGE: Record<string, string> = {
   aguardando_pagamento: "bg-amber-400/15 text-amber-300",
@@ -44,6 +45,15 @@ export default function AdminOrders() {
     onError: (error) => toast.error(apiErrorMessage(error)),
   });
 
+  const confirmPixMutation = useMutation({
+    mutationFn: (id: string) => apiPost<Order>(`/admin/orders/${id}/confirm-pix`),
+    onSuccess: async () => {
+      toast.success("Recebimento do Pix confirmado");
+      await queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+    },
+    onError: (error) => toast.error(apiErrorMessage(error)),
+  });
+
   return (
     <div data-testid="admin-orders-page" className="space-y-6">
       <div>
@@ -52,7 +62,7 @@ export default function AdminOrders() {
           Pedidos
         </h1>
         <p className="mt-1 text-sm text-[#BDBDBD]">
-          Pedidos reais criados somente após aprovação de pagamento — nada é simulado.
+          Confirme manualmente o recebimento dos pedidos Pix antes de iniciar a separação.
         </p>
       </div>
 
@@ -95,7 +105,22 @@ export default function AdminOrders() {
                   <TableCell className="font-bold text-[#DAA520]">{brl(order.total)}</TableCell>
                   <TableCell className="text-sm text-[#BDBDBD]">{formatDateTime(order.created_at)}</TableCell>
                   <TableCell className="text-sm text-[#BDBDBD]">
-                    {order.payment_method ? `PayPal (${order.payment_status})` : "—"}
+                    <p>{order.payment_method === "pix" ? `Pix (${order.payment_status})` : order.payment_method ? `PayPal (${order.payment_status})` : "—"}</p>
+                    {isAdmin && order.payment_method === "pix" && order.payment_status === "aguardando" && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="mt-2"
+                        disabled={confirmPixMutation.isPending}
+                        onClick={() => {
+                          if (window.confirm(`Confirma que o Pix do pedido ${order.number} entrou na conta?`)) {
+                            confirmPixMutation.mutate(order.id);
+                          }
+                        }}
+                      >
+                        Confirmar Pix recebido
+                      </Button>
+                    )}
                   </TableCell>
                   <TableCell className="text-sm font-semibold text-white" data-testid={`order-fulfillment-${order.number}`}>
                     {FULFILLMENT_METHOD_LABELS[order.fulfillment_method ?? "delivery"]}

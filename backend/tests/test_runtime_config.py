@@ -100,6 +100,18 @@ def test_staging_rejects_live_paypal(monkeypatch):
         validate_production_config()
 
 
+def test_enabled_pix_requires_a_valid_key(monkeypatch):
+    _production(monkeypatch)
+    monkeypatch.setenv('PIX_ENABLED', 'true')
+    monkeypatch.setenv('PIX_KEY', '')
+    with pytest.raises(RuntimeError, match='PIX_KEY'):
+        validate_production_config()
+
+    monkeypatch.setenv('PIX_KEY', '+5561999999999')
+    monkeypatch.setenv('PIX_RESERVATION_MINUTES', '60')
+    validate_production_config()
+
+
 def test_staging_can_disable_email_delivery(monkeypatch):
     _production(monkeypatch)
     monkeypatch.setenv('APP_ENV', 'staging')

@@ -50,12 +50,14 @@ async def transaction(callback):
         raise
 
 
-def reservation_ttl() -> timedelta:
+def reservation_ttl(payment_method: str = 'paypal') -> timedelta:
     try:
-        minutes = int(os.getenv('ORDER_RESERVATION_MINUTES', '15'))
+        variable = 'PIX_RESERVATION_MINUTES' if payment_method == 'pix' else 'ORDER_RESERVATION_MINUTES'
+        minutes = int(os.getenv(variable, '60' if payment_method == 'pix' else '15'))
     except ValueError:
-        minutes = 15
-    return timedelta(minutes=max(5, min(minutes, 60)))
+        minutes = 60 if payment_method == 'pix' else 15
+    maximum = 1440 if payment_method == 'pix' else 60
+    return timedelta(minutes=max(5, min(minutes, maximum)))
 
 
 def _expired_reservation(now):
@@ -131,15 +133,30 @@ async def reservation_reaper(stop: asyncio.Event) -> None:
             pass
 
 
-def available():
-    if not paypal_configured():
+def pix_configured() -> bool:
+    return os.getenv('PIX_ENABLED', 'false').lower() == 'true' and bool(pix_key())
+
+
+def pix_key() -> str:
+    return os.getenv('PIX_KEY', '').strip()
+
+
+def available(payment_method: str = 'paypal'):
+    configured = pix_configured() if payment_method == 'pix' else paypal_configured()
+    if not configured:
         raise HTTPException(503, 'Pagamentos indisponíveis no momento.')
 
 
 @router.get('/payments/status', response_model=PaymentStatusOut)
 async def payments_status():
     configured = paypal_configured()
-    return PaymentStatusOut(paypal_configured=configured, paypal_mode=paypal_mode() if configured else None)
+    pix_available = pix_configured()
+    return PaymentStatusOut(
+        paypal_configured=configured,
+        paypal_mode=paypal_mode() if configured else None,
+        pix_configured=pix_available,
+        pix_key=pix_key() if pix_available else None,
+    )
 
 
 @router.post('/shipping/quote', response_model=ShippingQuoteOut)
@@ -253,7 +270,7 @@ async def reconcile_payment(order: dict, actor_id: str | None = None) -> dict:
 
 @router.post('/orders', response_model=Order)
 async def create_order(input: OrderCreate, user: dict = Depends(get_current_user)):
-    available()
+    available(input.payment_method)
     await expire_pending_orders()
     quantities = {}
     for item in input.items:
@@ -273,6 +290,7 @@ async def create_order(input: OrderCreate, user: dict = Depends(get_current_user
     request_fingerprint = {
         'items': quantities,
         'fulfillment_method': input.fulfillment_method,
+        'payment_method': input.payment_method,
         'shipping_address': input.shipping_address.model_dump() if input.shipping_address else None,
     }
     fingerprint = hashlib.sha256(json.dumps(request_fingerprint, sort_keys=True).encode()).hexdigest()
@@ -322,8 +340,9 @@ async def create_order(input: OrderCreate, user: dict = Depends(get_current_user
                      **input.shipping_address.model_dump(),
                      **{key: shipping[key] for key in ('street', 'neighborhood', 'city', 'state')},
                  } if shipping else None,
-                 'status': 'aguardando_pagamento', 'payment_method': 'paypal', 'payment_status': 'aguardando',
-                 'paypal_order_id': None, 'created_at': now, 'reservation_expires_at': now + reservation_ttl(),
+                 'status': 'aguardando_pagamento', 'payment_method': input.payment_method, 'payment_status': 'aguardando',
+                 'paypal_order_id': None, 'created_at': now,
+                 'reservation_expires_at': now + reservation_ttl(input.payment_method),
                  'idempotency_key': key, 'request_hash': fingerprint}
         await db.orders.insert_one(order, session=session)
         await db.order_items.insert_many(items, session=session)
@@ -355,6 +374,8 @@ async def paypal_create_payment(input: PaypalCreateIn, user: dict = Depends(get_
     available()
     await expire_pending_orders(user_id=user['id'])
     order = await owned(input.order_id, user)
+    if order.get('payment_method') != 'paypal':
+        raise HTTPException(409, 'Este pedido foi criado para pagamento via Pix.')
     if order['status'] != 'aguardando_pagamento' or order['payment_status'] != 'aguardando':
         raise HTTPException(409, 'Este pedido não está aguardando pagamento.')
     expected = urlsplit(os.getenv('PUBLIC_ORIGIN', 'http://localhost:3000'))

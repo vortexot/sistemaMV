@@ -153,6 +153,17 @@ def validate_production_config() -> None:
         if environment == 'staging' and os.getenv('PAYPAL_MODE') != 'sandbox':
             problems.append('staging can only use PAYPAL_MODE=sandbox')
 
+    if os.getenv('PIX_ENABLED', 'false') == 'true':
+        pix_key = os.getenv('PIX_KEY', '').strip()
+        if not pix_key or len(pix_key) > 100:
+            problems.append('PIX_KEY is required and must be at most 100 characters when Pix is enabled')
+        try:
+            pix_reservation_minutes = int(os.getenv('PIX_RESERVATION_MINUTES', '60'))
+        except ValueError:
+            pix_reservation_minutes = 0
+        if not 5 <= pix_reservation_minutes <= 1440:
+            problems.append('PIX_RESERVATION_MINUTES must be between 5 and 1440')
+
     if os.getenv('CORREIOS_ENABLED', 'false') == 'true':
         delegated = os.getenv('CORREIOS_ACCESS_TOKEN', '').strip()
         credentials = all(os.getenv(key, '').strip() for key in (

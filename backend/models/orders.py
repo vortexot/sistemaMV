@@ -87,6 +87,7 @@ class OrderCreate(BaseModel):
     items: list[OrderItemIn] = Field(min_length=1, max_length=100)
     idempotency_key: uuid.UUID
     fulfillment_method: Literal['delivery', 'pickup'] = 'delivery'
+    payment_method: Literal['paypal', 'pix'] = 'paypal'
     shipping_address: ShippingAddressIn | None = None
 
     @model_validator(mode='after')
@@ -137,6 +138,8 @@ class Order(BaseModel):
 class PaymentStatusOut(BaseModel):
     paypal_configured: bool
     paypal_mode: str | None = None
+    pix_configured: bool = False
+    pix_key: str | None = None
 
 
 class PaypalCreateIn(BaseModel):

@@ -166,6 +166,8 @@ export interface Order {
 export interface PaymentStatus {
   paypal_configured: boolean;
   paypal_mode: string | null;
+  pix_configured: boolean;
+  pix_key: string | null;
 }
 
 export interface PaypalApproval {

@@ -373,6 +373,34 @@ async def update_order(
     return await _attach_items(doc)
 
 
+@router.post("/orders/{order_id}/confirm-pix", response_model=Order)
+async def confirm_pix_payment(
+    order_id: str, admin: dict = Depends(require_recent_auth("admin"))
+) -> Order:
+    now = utcnow()
+    result = await db.orders.update_one(
+        {
+            'id': order_id,
+            'payment_method': 'pix',
+            'status': 'aguardando_pagamento',
+            'payment_status': 'aguardando',
+            'reservation_expires_at': {'$gt': now},
+        },
+        {
+            '$set': {'status': 'aprovado', 'payment_status': 'pago', 'paid_at': now},
+            '$unset': {'reservation_expires_at': ''},
+        },
+    )
+    if not result.modified_count:
+        doc = await db.orders.find_one({'id': order_id}, {'_id': 0})
+        if not doc:
+            raise HTTPException(404, 'Pedido não encontrado.')
+        raise HTTPException(409, 'O Pix não está aguardando confirmação ou a reserva expirou.')
+    audit_event('PAYMENT_STATE_CHANGE', actor_id=admin['id'], order_id=order_id,
+                details={'method': 'pix', 'from': 'aguardando', 'to': 'pago'})
+    return await _attach_items(await db.orders.find_one({'id': order_id}, {'_id': 0}))
+
+
 @router.post('/payments/paypal/reconcile', response_model=Order)
 async def reconcile_paypal_as_admin(
     input: PaypalCaptureIn, admin: dict = Depends(require_recent_auth('admin'))

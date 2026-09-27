@@ -20,7 +20,15 @@ O código aceita retirada, motoboy regional, Correios e pagamento PayPal. As cre
 
 Por padrão, o sistema consulta PAC (`03298`) e SEDEX (`03220`) e oferece o serviço disponível de menor preço. Outros códigos contratados podem ser informados em `CORREIOS_SERVICE_CODES`.
 
-## 2. Pagamento PayPal
+## 2. Pagamento Pix manual
+
+O checkout aceita a chave Pix de telefone configurada em `PIX_KEY`. Com `PIX_ENABLED=true`, o cliente autenticado cria o pedido, copia a chave e tem 60 minutos para pagar. O pedido permanece como **aguardando pagamento** até um administrador conferir o extrato e clicar em **Confirmar Pix recebido** no painel.
+
+Essa confirmação manual não deve ser feita apenas com base em comprovante enviado pelo cliente; confira a entrada real na conta. Para confirmação automática, substitua esse fluxo por uma instituição ou intermediador que ofereça API Pix e webhook de cobrança.
+
+Antes da venda do site, o comprador deve trocar `PIX_KEY` pela própria chave e fazer um pagamento real de baixo valor.
+
+## 3. Pagamento PayPal
 
 1. O comprador da loja cria ou valida uma conta PayPal Business.
 2. No [PayPal Developer Dashboard](https://developer.paypal.com/dashboard/), cria uma aplicação e copia primeiro as credenciais Sandbox.
@@ -31,7 +39,7 @@ Por padrão, o sistema consulta PAC (`03298`) e SEDEX (`03220`) e oferece o serv
 
 O backend cria e captura a cobrança em BRL, valida o valor no retorno do PayPal, evita captura repetida e só confirma o pedido depois do pagamento aprovado. O segredo PayPal nunca vai para o navegador.
 
-## 3. Antes de vender ou transferir
+## 4. Antes de vender ou transferir
 
 - Transferir GitHub, Vercel, Render, domínio e banco de dados para contas do comprador.
 - O comprador deve criar credenciais próprias de PayPal, Correios e e-mail; não reutilizar as do vendedor.
@@ -40,4 +48,4 @@ O backend cria e captura a cobrança em BRL, valida o valor no retorno do PayPal
 - Rotacionar `JWT_SECRET`, `MFA_ENCRYPTION_KEY` e todos os tokens após a transferência.
 - Fazer uma compra real de baixo valor, conferir recebimento, frete, estoque, pedido, estorno e conciliação antes de abrir a loja ao público.
 
-PayPal é o meio já implementado. Pix e cartão direto exigem contrato e integração separados com um provedor brasileiro; não devem ser simulados nem ativados sem credenciais do novo proprietário.
+Pix manual e PayPal são os meios implementados. Pix com confirmação automática e cartão direto exigem integração com uma instituição ou intermediador; não devem ser simulados nem ativados sem credenciais do novo proprietário.

@@ -115,6 +115,7 @@ async def test_anonymous_and_buyer_cannot_admin(secure):
         assert (await secure.api.get('/api/admin/' + path)).status_code == 401
         assert (await secure.api.get('/api/admin/' + path, headers=secure.headers())).status_code == 403
     assert (await secure.api.patch('/api/admin/customers/admin', json={'role': 'admin'}, headers=secure.headers())).status_code == 403
+    assert (await secure.api.post('/api/orders', json=cart())).status_code == 401
 
 
 async def test_public_catalog_uses_minimal_response_models(secure):
@@ -522,6 +523,38 @@ async def test_emergency_pause(secure, monkeypatch):
     assert (await secure.api.post('/api/orders', json=cart(), headers=secure.headers())).status_code == 503
     assert not (await secure.api.get('/api/payments/status')).json()['paypal_configured']
     assert await secure.db.orders.count_documents({}) == 0
+
+
+async def test_manual_pix_requires_login_and_admin_confirmation(secure, monkeypatch):
+    monkeypatch.setenv('PAYMENTS_PAUSED', 'true')
+    monkeypatch.setenv('PIX_ENABLED', 'true')
+    monkeypatch.setenv('PIX_KEY', '+5561999999999')
+    monkeypatch.setenv('PIX_RESERVATION_MINUTES', '60')
+    status = (await secure.api.get('/api/payments/status')).json()
+    assert status['paypal_configured'] is False
+    assert status['pix_configured'] is True
+    assert status['pix_key'] == '+5561999999999'
+
+    request = {**cart(), 'payment_method': 'pix'}
+    assert (await secure.api.post('/api/orders', json=request)).status_code == 401
+    created = await secure.api.post('/api/orders', json=request, headers=secure.headers())
+    assert created.status_code == 200
+    order = created.json()
+    assert order['payment_method'] == 'pix'
+    assert order['payment_status'] == 'aguardando'
+
+    assert (await secure.api.post(
+        f"/api/admin/orders/{order['id']}/confirm-pix", json={}, headers=secure.headers('atendente')
+    )).status_code == 403
+    confirmed = await secure.api.post(
+        f"/api/admin/orders/{order['id']}/confirm-pix", json={}, headers=secure.headers('admin')
+    )
+    assert confirmed.status_code == 200
+    assert confirmed.json()['payment_status'] == 'pago'
+    assert confirmed.json()['status'] == 'aprovado'
+    assert (await secure.api.post(
+        f"/api/admin/orders/{order['id']}/confirm-pix", json={}, headers=secure.headers('admin')
+    )).status_code == 409
 
 
 async def test_login_and_absolute_session_deadline(secure, monkeypatch):

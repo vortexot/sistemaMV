@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ArrowLeft, Lock, ShieldCheck, ShoppingBag, Store, Truck } from "lucide-react";
 import { toast } from "sonner";
@@ -24,8 +24,9 @@ import ProductImage from "@/components/shop/ProductImage";
 
 export default function CheckoutPage() {
   const { items, clear } = useCart();
-  const { user } = useSession();
+  const { user, isLoading: sessionLoading } = useSession();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const { subtotal, descontos, total } = cartTotals(items);
@@ -51,6 +52,8 @@ export default function CheckoutPage() {
   });
   const paypalConfigured = paymentsQuery.data?.paypal_configured === true;
   const paypalMode = paymentsQuery.data?.paypal_mode ?? null;
+  const pixConfigured = paymentsQuery.data?.pix_configured === true;
+  const pixKey = paymentsQuery.data?.pix_key ?? null;
   const shippingFee = fulfillmentMethod === "delivery" && shippingQuote?.available ? shippingQuote.fee ?? 0 : 0;
   const checkoutTotal = total + shippingFee;
   const deliveryReady = fulfillmentMethod === "pickup" || (shippingQuote?.available === true && !!shippingAddress.number);
@@ -72,11 +75,10 @@ export default function CheckoutPage() {
     if (field === "postal_code") setShippingQuote(null);
   };
 
-  const paypalFlow = useMutation({
-    mutationFn: async () => {
-      // 1) our order is created first (status "Pagamento pendente", stock reserved)
+  const createStoreOrder = async (paymentMethod: "paypal" | "pix") => {
       const fingerprint = JSON.stringify([
         user?.id,
+        paymentMethod,
         fulfillmentMethod,
         fulfillmentMethod === "delivery" ? shippingAddress : null,
         items.map(i => [i.product_id, i.qty]).sort(),
@@ -88,10 +90,18 @@ export default function CheckoutPage() {
       sessionStorage.setItem("mv-checkout", JSON.stringify(attempt));
       const order = await apiPost<Order>("/orders", {
         idempotency_key: attempt.key,
+        payment_method: paymentMethod,
         fulfillment_method: fulfillmentMethod,
         shipping_address: fulfillmentMethod === "delivery" ? shippingAddress : null,
         items: items.map((item) => ({ product_id: item.product_id, qty: item.qty })),
       });
+      return order;
+  };
+
+  const paypalFlow = useMutation({
+    mutationFn: async () => {
+      // 1) our order is created first (status "Pagamento pendente", stock reserved)
+      const order = await createStoreOrder("paypal");
       // 2) the PayPal order is created server-side; credentials never touch the browser
       const origin = window.location.origin;
       const approval = await apiPost<PaypalApproval>("/payments/paypal/create", {
@@ -104,6 +114,18 @@ export default function CheckoutPage() {
     onSuccess: (approval) => {
       // 3) the shopper approves the payment on PayPal itself
       window.location.href = approval.approval_url;
+    },
+    onError: (error) => toast.error(apiErrorMessage(error)),
+  });
+
+  const pixFlow = useMutation({
+    mutationFn: () => createStoreOrder("pix"),
+    onSuccess: async (order) => {
+      sessionStorage.removeItem("mv-checkout");
+      sessionStorage.removeItem("mv-fulfillment-method");
+      clear();
+      await queryClient.invalidateQueries({ queryKey: ["orders"] });
+      navigate("/pedido-confirmado", { replace: true, state: { order, pixKey } });
     },
     onError: (error) => toast.error(apiErrorMessage(error)),
   });
@@ -134,12 +156,12 @@ export default function CheckoutPage() {
   useEffect(() => {
     const flow = searchParams.get("paypal");
     const orderId = searchParams.get("order_id");
-    if (!flow || !orderId || returnHandled.current) return;
+    if (sessionLoading || !user || !flow || !orderId || returnHandled.current) return;
     returnHandled.current = true;
     setSearchParams({}, { replace: true });
     if (flow === "return") captureMutation.mutate(orderId);
     if (flow === "cancel") cancelMutation.mutate(orderId);
-  }, [searchParams, setSearchParams, captureMutation, cancelMutation]);
+  }, [sessionLoading, user, searchParams, setSearchParams, captureMutation, cancelMutation]);
 
   const startPayment = () => {
     if (!deliveryReady) {
@@ -158,6 +180,26 @@ export default function CheckoutPage() {
     : paypalFlow.isPending
       ? "Redirecionando…"
       : `Pagar ${brl(checkoutTotal)} com PayPal`;
+
+  const startPixPayment = () => {
+    if (!deliveryReady) {
+      toast("Calcule o frete e informe o número antes de continuar.");
+      return;
+    }
+    pixFlow.mutate();
+  };
+
+  if (sessionLoading) {
+    return (
+      <div role="status" className="flex min-h-[60svh] items-center justify-center text-sm text-[#BDBDBD]">
+        Verificando sua sessão…
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace state={{ returnTo: `${location.pathname}${location.search}` }} />;
+  }
 
   if (captureMutation.isPending) {
     return (
@@ -439,52 +481,60 @@ export default function CheckoutPage() {
                 <div className="h-4 w-1/2 animate-pulse rounded bg-[#242424]" />
                 <div className="h-11 w-full animate-pulse rounded-lg bg-[#242424]" />
               </div>
-            ) : paypalConfigured ? (
-              <div className="mt-5 space-y-3" data-testid="paypal-available-area">
-                <p data-testid="paypal-available-message" className="text-sm text-emerald-400">
-                  PayPal conectado{paypalMode === "sandbox" ? " (ambiente de testes)" : ""} — você
-                  será levado ao PayPal para aprovar o pagamento com segurança.
-                </p>
-                {!user && (
-                  <p className="text-sm text-[#BDBDBD]">
-                    <Link to="/login" className="font-bold text-[#DAA520] hover:underline">
-                      Entre na sua conta
-                    </Link>{" "}
-                    para concluir a compra.
-                  </p>
-                )}
-                <Button
-                  type="button"
-                  data-testid="paypal-payment-button"
-                  disabled={paypalFlow.isPending || !deliveryReady}
-                  onClick={startPayment}
-                  aria-busy={paypalFlow.isPending}
-                  className="w-full bg-[#DAA520] font-bold uppercase tracking-wide text-[#0B0B0B] hover:bg-[#A07C1B]"
-                >
-                  {paymentButtonLabel}
-                </Button>
-                <p className="text-xs text-[#BDBDBD]">
-                  A cobrança é processada pelo PayPal. Seus dados de pagamento nunca passam por esta loja e o carrinho só é esvaziado após a aprovação.
-                </p>
-              </div>
             ) : (
-              <div className="mt-5 space-y-3" data-testid="paypal-blocked-area">
-                <p className="flex items-center gap-2 text-sm font-bold text-[#DAA520]" data-testid="paypal-unavailable-message">
-                  <Lock className="h-4 w-4" /> PayPal indisponível no momento
-                </p>
-                <p className="text-sm leading-relaxed text-[#BDBDBD]" data-testid="paypal-no-charge-message">
-                  {paymentsQuery.isError
-                    ? "Não foi possível consultar o serviço de pagamento. Verifique sua conexão e tente novamente."
-                    : "O pagamento está temporariamente indisponível. Tente novamente mais tarde."}
-                </p>
-                <Button
-                  type="button"
-                  data-testid="paypal-payment-button"
-                  disabled
-                  className="w-full cursor-not-allowed bg-[#242424] font-bold uppercase tracking-wide text-[#BDBDBD]"
-                >
-                  Pagar com PayPal
-                </Button>
+              <div className="mt-5 space-y-5">
+                {pixConfigured && pixKey && (
+                  <div className="space-y-3" data-testid="pix-available-area">
+                    <p className="text-sm text-emerald-400">
+                      Pix disponível — o pedido será reservado por 60 minutos para você realizar a transferência.
+                    </p>
+                    <Button
+                      type="button"
+                      data-testid="pix-payment-button"
+                      disabled={pixFlow.isPending || !deliveryReady}
+                      onClick={startPixPayment}
+                      aria-busy={pixFlow.isPending}
+                      className="w-full bg-[#DAA520] font-bold uppercase tracking-wide text-[#0B0B0B] hover:bg-[#A07C1B]"
+                    >
+                      {pixFlow.isPending ? "Criando pedido…" : `Pagar ${brl(checkoutTotal)} via Pix`}
+                    </Button>
+                    <p className="text-xs leading-relaxed text-[#BDBDBD]">
+                      Após criar o pedido, mostraremos a chave Pix. A loja confirmará o recebimento antes de preparar ou enviar a compra.
+                    </p>
+                  </div>
+                )}
+
+                {paypalConfigured && (
+                  <div className="space-y-3 border-t border-[#343434] pt-5" data-testid="paypal-available-area">
+                    <p data-testid="paypal-available-message" className="text-sm text-emerald-400">
+                      PayPal conectado{paypalMode === "sandbox" ? " (ambiente de testes)" : ""} — aprovação segura no PayPal.
+                    </p>
+                    <Button
+                      type="button"
+                      data-testid="paypal-payment-button"
+                      disabled={paypalFlow.isPending || !deliveryReady}
+                      onClick={startPayment}
+                      aria-busy={paypalFlow.isPending}
+                      variant="outline"
+                      className="w-full font-bold uppercase tracking-wide"
+                    >
+                      {paymentButtonLabel}
+                    </Button>
+                  </div>
+                )}
+
+                {!pixConfigured && !paypalConfigured && (
+                  <div className="space-y-3" data-testid="payments-blocked-area">
+                    <p className="flex items-center gap-2 text-sm font-bold text-[#DAA520]">
+                      <Lock className="h-4 w-4" /> Pagamento indisponível no momento
+                    </p>
+                    <p className="text-sm leading-relaxed text-[#BDBDBD]">
+                      {paymentsQuery.isError
+                        ? "Não foi possível consultar o serviço de pagamento. Verifique sua conexão e tente novamente."
+                        : "Nenhuma forma de pagamento está configurada. Tente novamente mais tarde."}
+                    </p>
+                  </div>
+                )}
                 {paymentsQuery.isError && (
                   <Button
                     type="button"
@@ -525,16 +575,18 @@ export default function CheckoutPage() {
           </Link>
         </aside>
       </div>
-      {paypalConfigured && (
+      {(pixConfigured || paypalConfigured) && (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#DAA520]/30 bg-[#0B0B0B] px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] lg:hidden">
           <Button
             type="button"
-            disabled={paypalFlow.isPending || !deliveryReady}
-            onClick={startPayment}
-            aria-busy={paypalFlow.isPending}
+            disabled={(pixConfigured ? pixFlow.isPending : paypalFlow.isPending) || !deliveryReady}
+            onClick={pixConfigured ? startPixPayment : startPayment}
+            aria-busy={pixConfigured ? pixFlow.isPending : paypalFlow.isPending}
             className="mx-auto flex w-full max-w-md bg-[#DAA520] font-bold uppercase tracking-wide text-[#0B0B0B] hover:bg-[#A07C1B]"
           >
-            {paymentButtonLabel}
+            {pixConfigured
+              ? pixFlow.isPending ? "Criando pedido…" : `Pagar ${brl(checkoutTotal)} via Pix`
+              : paymentButtonLabel}
           </Button>
         </div>
       )}
