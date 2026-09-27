@@ -70,6 +70,21 @@ async function stubPublicApi(page: Page) {
       await route.fulfill({ json: { paypal_configured: false, paypal_mode: null } });
       return;
     }
+    if (pathname === "/api/shipping/quote") {
+      await route.fulfill({ json: {
+        method: "motoboy",
+        available: true,
+        fee: 9,
+        distance_km: 0,
+        origin_store: "Valparaíso de Goiás",
+        postal_code: "72871059",
+        street: "Rua 59",
+        neighborhood: "Jardim Céu Azul",
+        city: "Valparaíso de Goiás",
+        state: "GO",
+      } });
+      return;
+    }
     await route.fulfill({ json: [] });
   });
 }
@@ -149,6 +164,10 @@ test("public purchase journey remains usable across the mobile matrix", async ({
   const deliveryOption = page.getByRole("radio", { name: /Receber em casa/ });
   const pickupOption = page.getByRole("radio", { name: /Retirar na loja/ });
   await expect(deliveryOption).toBeChecked();
+  await page.getByLabel("CEP").fill("72871-059");
+  await page.getByRole("button", { name: "Calcular frete" }).click();
+  await expect(page.getByTestId("motoboy-quote")).toContainText("R$ 9,00");
+  await expect(page.getByTestId("checkout-total")).toContainText("R$ 78,90");
   await pickupOption.check();
   await expect(pickupOption).toBeChecked();
   await expect(page.getByTestId("fulfillment-method")).toContainText("Retirada grátis");
@@ -177,6 +196,7 @@ test("cancelled PayPal flow preserves the cart and explains the recovery path", 
   await expect(page.getByTestId("cinematic-hero")).toHaveAttribute("data-phase", "HERO_READY", { timeout: 15_000 });
   await page.getByTestId("add-cart-product-mobile-product").first().click();
   await page.goto("/checkout");
+  await page.getByRole("radio", { name: /Retirar na loja/ }).check();
   await page.getByTestId("paypal-payment-button").first().click();
 
   await expect(page).toHaveURL(/\/checkout$/);

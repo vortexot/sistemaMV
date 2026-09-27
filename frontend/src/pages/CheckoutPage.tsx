@@ -10,7 +10,14 @@ import { useCart, cartTotals } from "@/lib/cart";
 import { useSession } from "@/lib/session";
 import { brl } from "@/lib/format";
 import { businessInfo } from "@/lib/site";
-import type { FulfillmentMethod, Order, PaymentStatus, PaypalApproval } from "@/lib/types";
+import type {
+  FulfillmentMethod,
+  Order,
+  PaymentStatus,
+  PaypalApproval,
+  ShippingAddressInput,
+  ShippingQuote,
+} from "@/lib/types";
 import { Button, buttonVariants } from "@/components/ui/button";
 import EmptyState from "@/components/shop/EmptyState";
 import ProductImage from "@/components/shop/ProductImage";
@@ -26,6 +33,12 @@ export default function CheckoutPage() {
   const [fulfillmentMethod, setFulfillmentMethod] = useState<FulfillmentMethod>(() =>
     sessionStorage.getItem("mv-fulfillment-method") === "pickup" ? "pickup" : "delivery",
   );
+  const [shippingAddress, setShippingAddress] = useState<ShippingAddressInput>({
+    postal_code: "",
+    number: "",
+    complement: "",
+  });
+  const [shippingQuote, setShippingQuote] = useState<ShippingQuote | null>(null);
 
   useEffect(() => {
     sessionStorage.setItem("mv-fulfillment-method", fulfillmentMethod);
@@ -38,11 +51,33 @@ export default function CheckoutPage() {
   });
   const paypalConfigured = paymentsQuery.data?.paypal_configured === true;
   const paypalMode = paymentsQuery.data?.paypal_mode ?? null;
+  const shippingFee = fulfillmentMethod === "delivery" && shippingQuote?.available ? shippingQuote.fee ?? 0 : 0;
+  const checkoutTotal = total + shippingFee;
+  const deliveryReady = fulfillmentMethod === "pickup" || (shippingQuote?.available === true && !!shippingAddress.number);
+
+  const shippingMutation = useMutation({
+    mutationFn: () => apiPost<ShippingQuote>("/shipping/quote", { postal_code: shippingAddress.postal_code }),
+    onSuccess: setShippingQuote,
+    onError: (error) => {
+      setShippingQuote(null);
+      toast.error(apiErrorMessage(error));
+    },
+  });
+
+  const updateShippingAddress = (field: keyof ShippingAddressInput, value: string) => {
+    setShippingAddress((current) => ({ ...current, [field]: value }));
+    if (field === "postal_code") setShippingQuote(null);
+  };
 
   const paypalFlow = useMutation({
     mutationFn: async () => {
       // 1) our order is created first (status "Pagamento pendente", stock reserved)
-      const fingerprint = JSON.stringify([user?.id, fulfillmentMethod, items.map(i => [i.product_id, i.qty]).sort()]);
+      const fingerprint = JSON.stringify([
+        user?.id,
+        fulfillmentMethod,
+        fulfillmentMethod === "delivery" ? shippingAddress : null,
+        items.map(i => [i.product_id, i.qty]).sort(),
+      ]);
       const stored = sessionStorage.getItem("mv-checkout");
       let attempt: {fingerprint: string; key: string} | null = null;
       try { attempt = stored ? JSON.parse(stored) : null; } catch { /* discard invalid browser state */ }
@@ -51,6 +86,7 @@ export default function CheckoutPage() {
       const order = await apiPost<Order>("/orders", {
         idempotency_key: attempt.key,
         fulfillment_method: fulfillmentMethod,
+        shipping_address: fulfillmentMethod === "delivery" ? shippingAddress : null,
         items: items.map((item) => ({ product_id: item.product_id, qty: item.qty })),
       });
       // 2) the PayPal order is created server-side; credentials never touch the browser
@@ -103,6 +139,10 @@ export default function CheckoutPage() {
   }, [searchParams, setSearchParams, captureMutation, cancelMutation]);
 
   const startPayment = () => {
+    if (!deliveryReady) {
+      toast("Calcule o frete e informe o número antes de continuar.");
+      return;
+    }
     if (!user) {
       toast("Entre na sua conta para concluir a compra.");
       navigate("/login", { state: { returnTo: "/checkout" } });
@@ -114,7 +154,7 @@ export default function CheckoutPage() {
     ? "Entrar para concluir a compra"
     : paypalFlow.isPending
       ? "Redirecionando…"
-      : `Pagar ${brl(total)} com PayPal`;
+      : `Pagar ${brl(checkoutTotal)} com PayPal`;
 
   if (captureMutation.isPending) {
     return (
@@ -271,6 +311,78 @@ export default function CheckoutPage() {
                 Ver localização da loja
               </a>
             )}
+            {fulfillmentMethod === "delivery" && (
+              <div className="mt-5 rounded-xl border border-[#343434] bg-[#0B0B0B] p-4">
+                <h3 className="font-bold text-white">Endereço de entrega</h3>
+                <p className="mt-1 text-xs leading-relaxed text-[#BDBDBD]">
+                  Em Valparaíso e Luziânia, o motoboy custa R$ 9 de saída + R$ 4 por km, limitado a R$ 50.
+                </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+                  <label className="text-sm font-bold text-white">
+                    CEP
+                    <input
+                      value={shippingAddress.postal_code}
+                      onChange={(event) => updateShippingAddress("postal_code", event.target.value)}
+                      inputMode="numeric"
+                      autoComplete="postal-code"
+                      placeholder="00000-000"
+                      maxLength={9}
+                      className="mt-1 min-h-11 w-full rounded-lg border border-[#343434] bg-[#151515] px-3 text-white outline-none focus:border-[#DAA520]"
+                    />
+                  </label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => shippingMutation.mutate()}
+                    disabled={shippingMutation.isPending || shippingAddress.postal_code.replace(/\D/g, "").length !== 8}
+                    aria-busy={shippingMutation.isPending}
+                    className="self-end"
+                  >
+                    {shippingMutation.isPending ? "Calculando…" : "Calcular frete"}
+                  </Button>
+                </div>
+                {shippingQuote && (
+                  <div className="mt-4" role="status" aria-live="polite">
+                    <p className="text-sm font-bold text-white">
+                      {shippingQuote.street}{shippingQuote.neighborhood ? `, ${shippingQuote.neighborhood}` : ""} — {shippingQuote.city}/{shippingQuote.state}
+                    </p>
+                    {shippingQuote.available ? (
+                      <p data-testid="motoboy-quote" className="mt-1 text-sm text-emerald-400">
+                        Motoboy da unidade {shippingQuote.origin_store}: aproximadamente {shippingQuote.distance_km?.toFixed(1)} km · {brl(shippingQuote.fee ?? 0)}
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-sm text-[#DAA520]">
+                        Fora da rota local de motoboy. A cotação dos Correios ainda precisa ser configurada pela loja.
+                      </p>
+                    )}
+                  </div>
+                )}
+                {shippingQuote?.available && (
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <label className="text-sm font-bold text-white">
+                      Número
+                      <input
+                        value={shippingAddress.number}
+                        onChange={(event) => updateShippingAddress("number", event.target.value)}
+                        autoComplete="address-line2"
+                        maxLength={30}
+                        className="mt-1 min-h-11 w-full rounded-lg border border-[#343434] bg-[#151515] px-3 text-white outline-none focus:border-[#DAA520]"
+                      />
+                    </label>
+                    <label className="text-sm font-bold text-white">
+                      Complemento <span className="font-normal text-[#BDBDBD]">(opcional)</span>
+                      <input
+                        value={shippingAddress.complement}
+                        onChange={(event) => updateShippingAddress("complement", event.target.value)}
+                        autoComplete="address-line3"
+                        maxLength={120}
+                        className="mt-1 min-h-11 w-full rounded-lg border border-[#343434] bg-[#151515] px-3 text-white outline-none focus:border-[#DAA520]"
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+            )}
           </fieldset>
           <div className="mt-5 space-y-2 text-sm">
             <div className="flex justify-between text-[#BDBDBD]">
@@ -285,12 +397,18 @@ export default function CheckoutPage() {
             )}
             <div className="flex justify-between text-[#BDBDBD]">
               <span>Frete</span>
-              <span>{fulfillmentMethod === "pickup" ? "Grátis — retirada" : "A confirmar"}</span>
+              <span>
+                {fulfillmentMethod === "pickup"
+                  ? "Grátis — retirada"
+                  : shippingQuote?.available
+                    ? brl(shippingFee)
+                    : "Calcule pelo CEP"}
+              </span>
             </div>
             <div className="flex justify-between border-t border-[#242424] pt-3 text-xl font-bold">
               <span className="text-white">Total</span>
               <span data-testid="checkout-total" className="text-[#DAA520]">
-                {brl(total)}
+                {brl(checkoutTotal)}
               </span>
             </div>
           </div>
@@ -329,7 +447,7 @@ export default function CheckoutPage() {
                 <Button
                   type="button"
                   data-testid="paypal-payment-button"
-                  disabled={paypalFlow.isPending}
+                  disabled={paypalFlow.isPending || !deliveryReady}
                   onClick={startPayment}
                   aria-busy={paypalFlow.isPending}
                   className="w-full bg-[#DAA520] font-bold uppercase tracking-wide text-[#0B0B0B] hover:bg-[#A07C1B]"
@@ -382,11 +500,11 @@ export default function CheckoutPage() {
             <div className="flex justify-between text-lg font-bold">
               <span className="text-white">Total</span>
               <span data-testid="checkout-summary-total" className="text-[#DAA520]">
-                {brl(total)}
+                {brl(checkoutTotal)}
               </span>
             </div>
             <p className="mt-2 text-xs text-[#BDBDBD]">
-              {items.reduce((sum, i) => sum + i.qty, 0)} {items.reduce((sum, i) => sum + i.qty, 0) === 1 ? "item" : "itens"} · {fulfillmentMethod === "pickup" ? "Retirada na loja" : "Entrega a combinar"}
+              {items.reduce((sum, i) => sum + i.qty, 0)} {items.reduce((sum, i) => sum + i.qty, 0) === 1 ? "item" : "itens"} · {fulfillmentMethod === "pickup" ? "Retirada na loja" : shippingQuote?.available ? "Entrega por motoboy" : "Informe o CEP"}
             </p>
           </div>
 
@@ -402,7 +520,7 @@ export default function CheckoutPage() {
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#DAA520]/30 bg-[#0B0B0B] px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] lg:hidden">
           <Button
             type="button"
-            disabled={paypalFlow.isPending}
+            disabled={paypalFlow.isPending || !deliveryReady}
             onClick={startPayment}
             aria-busy={paypalFlow.isPending}
             className="mx-auto flex w-full max-w-md bg-[#DAA520] font-bold uppercase tracking-wide text-[#0B0B0B] hover:bg-[#A07C1B]"

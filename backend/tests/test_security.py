@@ -78,7 +78,7 @@ async def secure(monkeypatch):
 
 
 def cart(qty=1, key=None):
-    return {'idempotency_key': key or str(uuid.uuid4()), 'items': [{'product_id': 'product', 'qty': qty}]}
+    return {'idempotency_key': key or str(uuid.uuid4()), 'fulfillment_method': 'pickup', 'items': [{'product_id': 'product', 'qty': qty}]}
 
 
 def configure_auth_email(monkeypatch):
@@ -365,7 +365,15 @@ async def test_invalid_financial_fields_and_state(secure):
         assert (await secure.api.patch('/api/admin/orders/'+created['id'], headers=secure.headers('admin'), json={'status': status})).status_code == 409
 
 
-async def test_order_price_ownership_idempotency_and_conflict(secure):
+async def test_order_price_ownership_idempotency_and_conflict(secure, monkeypatch):
+    async def local_quote(_postal_code):
+        return {
+            'method': 'motoboy', 'available': True, 'fee': 9, 'distance_km': 0,
+            'origin_store': 'Valparaíso de Goiás', 'postal_code': '72871059',
+            'street': 'Rua 59', 'neighborhood': 'Jardim Céu Azul',
+            'city': 'Valparaíso de Goiás', 'state': 'GO',
+        }
+    monkeypatch.setattr(orders, 'get_shipping_quote', local_quote)
     request = {**cart(2), 'fulfillment_method': 'pickup'}
     response = await secure.api.post('/api/orders', json=request, headers=secure.headers())
     assert response.status_code == 200
@@ -373,7 +381,12 @@ async def test_order_price_ownership_idempotency_and_conflict(secure):
     assert order['total'] == 20.50
     assert order['fulfillment_method'] == 'pickup'
     assert (await secure.api.post('/api/orders', json=request, headers=secure.headers())).json()['id'] == order['id']
-    assert (await secure.api.post('/api/orders', json={**request, 'fulfillment_method': 'delivery'}, headers=secure.headers())).status_code == 409
+    delivery = {
+        **request,
+        'fulfillment_method': 'delivery',
+        'shipping_address': {'postal_code': '72871-059', 'number': '14', 'complement': ''},
+    }
+    assert (await secure.api.post('/api/orders', json=delivery, headers=secure.headers())).status_code == 409
     assert (await secure.api.post('/api/orders', json=cart(1, request['idempotency_key']), headers=secure.headers())).status_code == 409
     assert (await secure.db.products.find_one({'id': 'product'}))['stock'] == 3
     for path in ('/api/orders/'+order['id'],):
@@ -382,6 +395,28 @@ async def test_order_price_ownership_idempotency_and_conflict(secure):
         assert (await secure.api.post('/api/payments/paypal/'+action, json={'order_id': order['id']}, headers=secure.headers('atendente'))).status_code == 404
     assert (await secure.api.post('/api/orders', json={**cart(), 'total': .01}, headers=secure.headers())).status_code == 422
     assert (await secure.api.post('/api/orders', json={**cart(), 'fulfillment_method': 'invalid'}, headers=secure.headers())).status_code == 422
+
+
+async def test_delivery_fee_is_recalculated_by_server(secure, monkeypatch):
+    async def local_quote(_postal_code):
+        return {
+            'method': 'motoboy', 'available': True, 'fee': 9, 'distance_km': 0,
+            'origin_store': 'Valparaíso de Goiás', 'postal_code': '72871059',
+            'street': 'Rua 59', 'neighborhood': 'Jardim Céu Azul',
+            'city': 'Valparaíso de Goiás', 'state': 'GO',
+        }
+    monkeypatch.setattr(orders, 'get_shipping_quote', local_quote)
+    request = {
+        **cart(),
+        'fulfillment_method': 'delivery',
+        'shipping_address': {'postal_code': '72871-059', 'number': '14', 'complement': ''},
+    }
+    order = (await secure.api.post('/api/orders', json=request, headers=secure.headers())).json()
+    assert order['items_total'] == 10.25
+    assert order['shipping_fee'] == 9
+    assert order['total'] == 19.25
+    assert order['shipping_method'] == 'motoboy'
+    assert order['shipping_address']['postal_code'] == '72871059'
 
 
 async def test_order_concurrency_and_repeated_cancel(secure):

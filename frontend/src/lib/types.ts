@@ -106,6 +106,32 @@ export interface OrderItem {
 
 export type FulfillmentMethod = "delivery" | "pickup";
 
+export interface ShippingAddressInput {
+  postal_code: string;
+  number: string;
+  complement: string;
+}
+
+export interface ShippingAddress extends ShippingAddressInput {
+  street: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+}
+
+export interface ShippingQuote {
+  method: "motoboy" | "correios";
+  available: boolean;
+  fee: number | null;
+  distance_km: number | null;
+  origin_store: string | null;
+  postal_code: string;
+  street: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+}
+
 export interface Order {
   id: string;
   number: string;
@@ -116,6 +142,11 @@ export interface Order {
   items_total: number;
   total: number;
   fulfillment_method: FulfillmentMethod;
+  shipping_fee: number;
+  shipping_method: "motoboy" | "correios" | null;
+  shipping_distance_km: number | null;
+  shipping_origin: string | null;
+  shipping_address: ShippingAddress | null;
   status: string;
   payment_method: string | null;
   payment_status: string;

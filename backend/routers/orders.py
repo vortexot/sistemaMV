@@ -15,8 +15,19 @@ from lib.dates import utcnow, with_utc
 from lib.audit import audit_event
 from lib.paypal import capture_order as paypal_capture, create_order as paypal_create, get_order as paypal_get
 from lib.paypal import paypal_configured, paypal_mode
+from lib.shipping import shipping_quote as get_shipping_quote
 from lib.security import get_current_user
-from models.orders import Order, OrderCreate, OrderItem, PaymentStatusOut, PaypalApprovalOut, PaypalCaptureIn, PaypalCreateIn
+from models.orders import (
+    Order,
+    OrderCreate,
+    OrderItem,
+    PaymentStatusOut,
+    PaypalApprovalOut,
+    PaypalCaptureIn,
+    PaypalCreateIn,
+    ShippingQuoteIn,
+    ShippingQuoteOut,
+)
 from routers.catalog import public_product_filter
 
 router = APIRouter()
@@ -131,6 +142,16 @@ async def payments_status():
     return PaymentStatusOut(paypal_configured=configured, paypal_mode=paypal_mode() if configured else None)
 
 
+@router.post('/shipping/quote', response_model=ShippingQuoteOut)
+async def quote_shipping(input: ShippingQuoteIn):
+    try:
+        return ShippingQuoteOut(**await get_shipping_quote(input.postal_code))
+    except ValueError as error:
+        raise HTTPException(422, str(error))
+    except RuntimeError as error:
+        raise HTTPException(503, str(error))
+
+
 async def _attach_items(doc, session=None):
     items = await db.order_items.find({'order_id': doc['id']}, {'_id': 0}, session=session).to_list(100)
     return Order(**with_utc(doc), items=[OrderItem(**with_utc(item)) for item in items])
@@ -234,6 +255,16 @@ async def reconcile_payment(order: dict, actor_id: str | None = None) -> dict:
 async def create_order(input: OrderCreate, user: dict = Depends(get_current_user)):
     available()
     await expire_pending_orders()
+    shipping = None
+    if input.fulfillment_method == 'delivery':
+        try:
+            shipping = await get_shipping_quote(input.shipping_address.postal_code)
+        except ValueError as error:
+            raise HTTPException(422, str(error))
+        except RuntimeError as error:
+            raise HTTPException(503, str(error))
+        if not shipping['available']:
+            raise HTTPException(503, 'A cotação pelos Correios ainda não está disponível. Escolha retirada na loja.')
     quantities = {}
     for item in input.items:
         quantities[item.product_id] = quantities.get(item.product_id, 0) + item.qty
@@ -242,6 +273,7 @@ async def create_order(input: OrderCreate, user: dict = Depends(get_current_user
     request_fingerprint = {
         'items': quantities,
         'fulfillment_method': input.fulfillment_method,
+        'shipping_address': input.shipping_address.model_dump() if input.shipping_address else None,
     }
     fingerprint = hashlib.sha256(json.dumps(request_fingerprint, sort_keys=True).encode()).hexdigest()
     key = str(input.idempotency_key)
@@ -272,11 +304,21 @@ async def create_order(input: OrderCreate, user: dict = Depends(get_current_user
             unit = money(product['promo_price'] if product.get('promo_price') is not None else product['price'])
             items.append({'id': str(uuid.uuid4()), 'order_id': order_id, 'product_id': product_id,
                           'name': product['name'], 'sku': product['sku'], 'unit_price': float(unit), 'qty': qty})
-        total = float(sum((money(i['unit_price']) * i['qty'] for i in items), Decimal(0)))
+        items_total = sum((money(i['unit_price']) * i['qty'] for i in items), Decimal(0))
+        shipping_fee = money(shipping['fee']) if shipping else Decimal(0)
+        total = float(items_total + shipping_fee)
         now = utcnow()
         order = {'id': order_id, 'number': 'MV-' + order_id, 'user_id': user['id'], 'customer_name': user['name'],
-                 'customer_email': user['email'], 'items_total': total, 'total': total,
+                 'customer_email': user['email'], 'items_total': float(items_total), 'total': total,
                  'fulfillment_method': input.fulfillment_method,
+                 'shipping_fee': float(shipping_fee),
+                 'shipping_method': shipping['method'] if shipping else None,
+                 'shipping_distance_km': shipping['distance_km'] if shipping else None,
+                 'shipping_origin': shipping['origin_store'] if shipping else None,
+                 'shipping_address': {
+                     **input.shipping_address.model_dump(),
+                     **{key: shipping[key] for key in ('street', 'neighborhood', 'city', 'state')},
+                 } if shipping else None,
                  'status': 'aguardando_pagamento', 'payment_method': 'paypal', 'payment_status': 'aguardando',
                  'paypal_order_id': None, 'created_at': now, 'reservation_expires_at': now + reservation_ttl(),
                  'idempotency_key': key, 'request_hash': fingerprint}

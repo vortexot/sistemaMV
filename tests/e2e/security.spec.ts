@@ -113,6 +113,7 @@ test('signing in from checkout returns to the preserved purchase', async ({ page
   });
 
   await page.goto('/checkout');
+  await page.getByRole('radio', { name: /Retirar na loja/ }).check();
   await page.getByTestId('paypal-payment-button').first().click();
   await expect(page).toHaveURL(/\/login$/);
   await page.getByTestId('login-email-input').fill(user.email);
