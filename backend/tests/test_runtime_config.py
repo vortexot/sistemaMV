@@ -129,6 +129,18 @@ def test_staging_rejects_partial_email_delivery_configuration(monkeypatch):
         validate_production_config()
 
 
+def test_resend_email_configuration(monkeypatch):
+    _production(monkeypatch)
+    monkeypatch.setenv('AUTH_EMAIL_PROVIDER', 'resend')
+    monkeypatch.setenv('RESEND_API_KEY', 're_' + 'a' * 32)
+    monkeypatch.setenv('AUTH_EMAIL_FROM', 'MV Multimarcas <contato@loja.example>')
+    validate_production_config()
+
+    monkeypatch.setenv('RESEND_API_KEY', 'invalid')
+    with pytest.raises(RuntimeError, match='Resend email delivery'):
+        validate_production_config()
+
+
 def test_enabled_correios_requires_credentials(monkeypatch):
     _production(monkeypatch)
     monkeypatch.setenv('CORREIOS_ENABLED', 'true')

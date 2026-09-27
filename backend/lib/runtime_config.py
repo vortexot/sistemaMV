@@ -127,13 +127,25 @@ def validate_production_config() -> None:
     if os.getenv('MFA_REQUIRED') != 'true':
         problems.append('MFA_REQUIRED=true is required in production')
 
-    email_url = os.getenv('AUTH_EMAIL_WEBHOOK_URL', '')
-    email_token = os.getenv('AUTH_EMAIL_WEBHOOK_TOKEN', '')
-    email_hosts = os.getenv('AUTH_EMAIL_WEBHOOK_ALLOWED_HOSTS', '')
-    email_configured = any((email_url, email_token, email_hosts))
-    if ((environment == 'production' or email_configured)
-            and (not _https_webhook(email_url, email_hosts) or not _strong_secret(email_token))):
-        problems.append('verified email delivery requires an allowlisted HTTPS webhook and strong token')
+    email_provider = os.getenv('AUTH_EMAIL_PROVIDER', 'webhook').strip().lower()
+    if email_provider not in {'webhook', 'resend'}:
+        problems.append('AUTH_EMAIL_PROVIDER must be webhook or resend')
+    elif email_provider == 'resend':
+        resend_key = os.getenv('RESEND_API_KEY', '').strip()
+        email_from = os.getenv('AUTH_EMAIL_FROM', '').strip()
+        resend_configured = any((resend_key, email_from))
+        if ((environment == 'production' or resend_configured)
+                and (not resend_key.startswith('re_') or len(resend_key) < 20
+                     or '@' not in email_from or '\n' in email_from or '\r' in email_from)):
+            problems.append('Resend email delivery requires a valid API key and sender')
+    else:
+        email_url = os.getenv('AUTH_EMAIL_WEBHOOK_URL', '')
+        email_token = os.getenv('AUTH_EMAIL_WEBHOOK_TOKEN', '')
+        email_hosts = os.getenv('AUTH_EMAIL_WEBHOOK_ALLOWED_HOSTS', '')
+        email_configured = any((email_url, email_token, email_hosts))
+        if ((environment == 'production' or email_configured)
+                and (not _https_webhook(email_url, email_hosts) or not _strong_secret(email_token))):
+            problems.append('verified email delivery requires an allowlisted HTTPS webhook and strong token')
 
     try:
         reservation_minutes = int(os.getenv('ORDER_RESERVATION_MINUTES', '15'))

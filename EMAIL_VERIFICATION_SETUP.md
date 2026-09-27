@@ -1,6 +1,23 @@
 # Entrega de verificação de e-mail
 
-O backend não envia nem simula e-mail por conta própria. Em staging e produção ele exige um webhook HTTPS autenticado, configurado pelas variáveis abaixo:
+## Opção recomendada: Resend
+
+O backend envia os e-mails diretamente pela API HTTPS da Resend, sem expor a chave no navegador e sem instalar SDK adicional.
+
+1. Criar a conta em <https://resend.com/>.
+2. Adicionar o domínio definitivo da loja e publicar no DNS os registros SPF e DKIM apresentados pela Resend.
+3. Aguardar o domínio aparecer como verificado.
+4. Criar uma API key restrita ao envio e cadastrar somente no Render:
+   - `AUTH_EMAIL_PROVIDER=resend`
+   - `RESEND_API_KEY`: chave criada no painel da Resend;
+   - `AUTH_EMAIL_FROM=MV Multimarcas <contato@seudominio.com.br>`
+5. Fazer novo deploy do backend e testar cadastro e recuperação com uma caixa controlada.
+
+O backend usa chave de idempotência por mensagem, não segue redirecionamentos, aplica timeout e não registra a API key nem o código enviado ao cliente. O cadastro continua bloqueado se a entrega falhar.
+
+## Alternativa: webhook próprio
+
+Para outro provedor, defina `AUTH_EMAIL_PROVIDER=webhook`. O backend exige um webhook HTTPS autenticado, configurado pelas variáveis abaixo:
 
 - `AUTH_EMAIL_WEBHOOK_URL`: URL HTTPS completa do serviço de entrega.
 - `AUTH_EMAIL_WEBHOOK_TOKEN`: segredo aleatório com pelo menos 32 bytes, enviado como `Authorization: Bearer ...`.
