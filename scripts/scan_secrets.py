@@ -13,7 +13,7 @@ PATTERNS = {
     'literal_password': re.compile(r'''(?im)["']?(?:password|senha)["']?[ \t]*[:=][ \t]*["']([^"'\r\n]{8,})["']'''),
     'literal_credential': re.compile(
         r'''(?im)(?:JWT_SECRET|PAYPAL_CLIENT_SECRET|SUPABASE_DB_URL|SUPABASE_SERVICE_ROLE_KEY|'''
-        r'''BOOTSTRAP_ADMIN_HASH|RESET_WEBHOOK_TOKEN|DATABASE_URL)[ \t]*["']?[ \t]*[:=][ \t]*'''
+        r'''BOOTSTRAP_ADMIN_HASH|RESET_WEBHOOK_TOKEN|AUTH_EMAIL_WEBHOOK_TOKEN|DATABASE_URL)[ \t]*["']?[ \t]*[:=][ \t]*'''
         r'''["']?([^\r\n"' ,}]{8,})'''
     ),
 }

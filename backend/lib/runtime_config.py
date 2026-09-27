@@ -34,6 +34,23 @@ def _https_origin(value: str) -> bool:
     )
 
 
+def _https_webhook(value: str, allowed_hosts: str) -> bool:
+    allowed = {host.strip().lower().rstrip('.') for host in allowed_hosts.split(',') if host.strip()}
+    try:
+        parsed = urlsplit(value)
+        port = parsed.port
+    except ValueError:
+        return False
+    return bool(
+        parsed.scheme == 'https'
+        and parsed.hostname
+        and parsed.hostname.lower().rstrip('.') in allowed
+        and port in (None, 443)
+        and not parsed.username
+        and not parsed.password
+    )
+
+
 def _trusted_proxy_list(value: str) -> bool:
     value = value.strip()
     if value == "*":
@@ -109,6 +126,22 @@ def validate_production_config() -> None:
             problems.append('MFA_ENCRYPTION_KEY_PREVIOUS must be a different valid Fernet key when set')
     if os.getenv('MFA_REQUIRED') != 'true':
         problems.append('MFA_REQUIRED=true is required in production')
+
+    email_url = os.getenv('AUTH_EMAIL_WEBHOOK_URL', '')
+    email_hosts = os.getenv('AUTH_EMAIL_WEBHOOK_ALLOWED_HOSTS', '')
+    if (not _https_webhook(email_url, email_hosts)
+            or not _strong_secret(os.getenv('AUTH_EMAIL_WEBHOOK_TOKEN', ''))):
+        problems.append('verified email delivery requires an allowlisted HTTPS webhook and strong token')
+
+    try:
+        reservation_minutes = int(os.getenv('ORDER_RESERVATION_MINUTES', '15'))
+        reaper_seconds = int(os.getenv('ORDER_RESERVATION_REAPER_SECONDS', '60'))
+    except ValueError:
+        reservation_minutes = reaper_seconds = 0
+    if not 5 <= reservation_minutes <= 60:
+        problems.append('ORDER_RESERVATION_MINUTES must be between 5 and 60')
+    if not 10 <= reaper_seconds <= 300:
+        problems.append('ORDER_RESERVATION_REAPER_SECONDS must be between 10 and 300')
 
     if os.getenv("PAYMENTS_PAUSED", "true") == "false":
         if not os.getenv("PAYPAL_CLIENT_ID") or not os.getenv("PAYPAL_CLIENT_SECRET"):

@@ -1,5 +1,7 @@
 # Relatório de preparação de segurança — MV Multimarcas
 
+> **Atualização de 25/09/2026:** a remediação posterior está registrada em [CONFIRMED_VULNERABILITIES_REPORT.md](CONFIRMED_VULNERABILITIES_REPORT.md). O código exige agora confirmação real de e-mail e reservas com expiração. Produção permanece bloqueada até configurar o webhook de e-mail, publicar no staging e concluir os retestes externos.
+
 **Data:** 23/09/2026
 **Branch/commit de partida:** `main` / `e7dd894dee545aebfb941e1fc0caa163ee09489d`
 **Estado:** alterações anteriores não commitadas foram preservadas; nenhum backup, tag ou histórico foi removido.
@@ -83,12 +85,14 @@ O scanner heurístico final examinou 200 arquivos e 308 blobs Git. Ele listou 23
 | `APP_ENV`, `APP_TZ` | AMBIENTE | Modo e fuso do backend |
 | `PUBLIC_ORIGIN`, `CORS_ORIGINS`, `FORWARDED_ALLOW_IPS` | AMBIENTE | Origem pública, CORS e proxies confiáveis |
 | `COOKIE_SECURE`, `MFA_REQUIRED`, `PAYMENTS_PAUSED`, `PAYPAL_MODE`, `STORAGE_PERSISTENT`, `GOOGLE_AUTH_ENABLED` | AMBIENTE | Flags operacionais; não contêm credencial |
-| `STORAGE_DIR`, `DB_NAME`, `RESET_WEBHOOK_ALLOWED_HOSTS` | SERVER-ONLY | Caminhos e identificadores internos |
+| `STORAGE_DIR`, `DB_NAME`, `RESET_WEBHOOK_ALLOWED_HOSTS`, `AUTH_EMAIL_WEBHOOK_URL`, `AUTH_EMAIL_WEBHOOK_ALLOWED_HOSTS` | SERVER-ONLY | Caminhos, identificadores e destino allowlisted de entrega |
 | `JWT_SECRET`, `MFA_ENCRYPTION_KEY`, `MFA_ENCRYPTION_KEY_PREVIOUS` | SECRET | Assinatura de sessão e criptografia de seeds MFA |
 | `MONGO_URL` | SECRET | Endpoint e credencial do MongoDB |
 | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | SECRET | Credenciais PayPal server-side |
 | `RESET_WEBHOOK_URL` | SERVER-ONLY | Destino HTTPS allowlisted de recuperação |
 | `RESET_WEBHOOK_TOKEN` | SECRET | Autorização do serviço de entrega |
+| `AUTH_EMAIL_WEBHOOK_TOKEN` | SECRET | Autorização da confirmação e recuperação por e-mail |
+| `ORDER_RESERVATION_MINUTES`, `ORDER_RESERVATION_REAPER_SECONDS` | AMBIENTE | Prazo da reserva e intervalo da expiração transacional |
 | Variáveis `VITE_*` do frontend | PÚBLICA | Incorporadas ao bundle; nunca devem conter secrets |
 
 ## Infraestrutura e backup
@@ -125,4 +129,6 @@ Esses itens continuam visíveis, mas não bloqueiam automaticamente staging nest
 - Em rollback financeiro, conciliar o PayPal antes de restaurar estado local; não restaurar cegamente um snapshot anterior a uma captura.
 - Reativar pagamentos, remover a pausa ou declarar produção exige staging real, Sandbox, restore remoto, smoke tests e pentest independente.
 
-**STATUS: PRONTO PARA STAGING**
+**STATUS HISTÓRICO EM 23/09/2026: PRONTO PARA STAGING**
+
+**STATUS ATUAL EM 25/09/2026: REMEDIAÇÃO VALIDADA LOCALMENTE; DEPLOY BLOQUEADO ATÉ CONFIGURAR E VALIDAR O WEBHOOK REAL DE E-MAIL.**

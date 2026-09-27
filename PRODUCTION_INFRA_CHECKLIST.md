@@ -10,6 +10,8 @@ Use primeiro em staging. Registre evidência, responsável e data em cada item. 
 - [ ] `FORWARDED_ALLOW_IPS` contém apenas IPs/CIDRs reais do proxy, nunca `*` ou `/0`.
 - [ ] Cookies têm `Secure`, `HttpOnly` e `SameSite`; HSTS e demais headers foram verificados no domínio final.
 - [ ] `APP_ENV=staging`; PayPal Live é recusado pelo startup.
+- [ ] Webhook de e-mail HTTPS está allowlisted, autenticado e validado com uma caixa controlada conforme `EMAIL_VERIFICATION_SETUP.md`.
+- [ ] `ORDER_RESERVATION_MINUTES` e `ORDER_RESERVATION_REAPER_SECONDS` estão configurados; um pedido abandonado de teste expirou e devolveu o estoque.
 - [ ] Todas as contas internas ativas possuem MFA e existe pelo menos um admin ativo.
 
 ## MongoDB

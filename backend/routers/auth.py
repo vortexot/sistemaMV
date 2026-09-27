@@ -1,22 +1,22 @@
 """Auth routes: register, login, refresh rotation, logout and password recovery."""
 
+import asyncio
 import uuid
 import os
 import secrets
 import hashlib
-import logging
-from urllib.parse import urlsplit
+import time
 from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 from datetime import datetime, timedelta, timezone
 
-import httpx
 import pyotp
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from lib.db import db
 from lib.dates import utcnow, with_utc
 from lib.audit import audit_event, subject_hash
+from lib.auth_email import configured as email_delivery_configured, deliver as deliver_auth_email
 from lib.mfa import (
     encrypt_secret,
     new_recovery_codes,
@@ -41,6 +41,7 @@ from lib.security import (
 )
 from models.auth import (
     ForgotPasswordIn,
+    EmailVerificationIn,
     LoginIn,
     MessageOut,
     MfaConfirmIn,
@@ -54,6 +55,7 @@ from models.auth import (
     PasswordChangeIn,
     ReauthenticateIn,
     RegisterIn,
+    ResendVerificationIn,
     ResetPasswordIn,
     UserPublic,
 )
@@ -62,15 +64,52 @@ router = APIRouter(prefix="/auth")
 
 LOCKOUT_WINDOW = timedelta(minutes=15)
 LOCKOUT_MAX_FAILURES = 5
+MIN_PUBLIC_AUTH_SECONDS = 0.35
 
 PUBLIC_FIELDS = ("id", "name", "email", "role", "status", "picture", "mfa_enabled", "created_at")
 DUMMY_HASH = hash_password(secrets.token_urlsafe(32))
+GENERIC_REGISTRATION_MESSAGE = "Se for possível continuar com este e-mail, enviaremos as instruções."
+GENERIC_VERIFICATION_MESSAGE = "Se a conta estiver aguardando confirmação, enviaremos novas instruções."
 
 
 def _public(user: dict) -> dict:
     result = {key: user.get(key) for key in PUBLIC_FIELDS}
     result['mfa_enabled'] = bool(user.get('mfa_enabled'))
+    result['email_verified'] = _email_verified(user)
     return with_utc(result)
+
+
+def _email_verified(user: dict) -> bool:
+    if 'email_verified' in user:
+        return user['email_verified'] is True
+    return user.get('role') in {'admin', 'atendente'}
+
+
+async def _verify_password(password: str, digest: str | None) -> bool:
+    return await asyncio.to_thread(verify_password, password, digest)
+
+
+async def _hash_password(password: str) -> str:
+    return await asyncio.to_thread(hash_password, password)
+
+
+async def _create_email_verification(user: dict, name: str, password_hash: str) -> str:
+    token = secrets.token_urlsafe(48)
+    await db.email_verification_tokens.update_many(
+        {'user_id': user['id'], 'used': False},
+        {'$set': {'used': True, 'superseded_at': utcnow()}},
+    )
+    await db.email_verification_tokens.insert_one({
+        'token': hashlib.sha256(token.encode()).hexdigest(),
+        'user_id': user['id'],
+        'email': user['email'],
+        'pending_name': name,
+        'pending_password_hash': password_hash,
+        'used': False,
+        'created_at': utcnow(),
+        'expires_at': utcnow() + timedelta(minutes=30),
+    })
+    return token
 
 
 def _issue(response: Response, user: dict, authenticated_at: int | None = None,
@@ -124,28 +163,112 @@ async def _rate_limit_login_failure(email: str, maximum: int = 10) -> None:
         raise HTTPException(429, 'Muitas tentativas. Aguarde alguns minutos.')
 
 
-@router.post("/register", response_model=UserPublic)
-async def register(input: RegisterIn, request: Request, response: Response) -> UserPublic:
+@router.post("/register", response_model=MessageOut, status_code=202)
+async def register(input: RegisterIn, request: Request) -> MessageOut:
     email = input.email.lower().strip()
-    await _rate_limit(request, 'register', email)
-    if await db.users.find_one({"email": email}, {"_id": 0}):
-        raise HTTPException(status_code=409, detail="Este e-mail já possui uma conta.")
-    user = {
-        "id": str(uuid.uuid4()),
-        "name": input.name.strip(),
-        "email": email,
-        "password_hash": hash_password(input.password),
-        "role": "comprador",
-        "status": "ativo",
-        "picture": None,
-        "token_version": 0,
-        "created_at": utcnow(),
-    }
-    try:
-        await db.users.insert_one(user)
-    except DuplicateKeyError:
-        raise HTTPException(409, 'Não foi possível cadastrar esta conta.')
-    return _issue(response, user)
+    await _rate_limit(request, 'register', email, 3)
+    if not email_delivery_configured():
+        raise HTTPException(503, 'Confirmação por e-mail indisponível. Tente novamente mais tarde.')
+
+    password_hash = await _hash_password(input.password)
+    user = await db.users.find_one({"email": email}, {"_id": 0})
+    if not user:
+        user = {
+            "id": str(uuid.uuid4()),
+            "name": input.name.strip(),
+            "email": email,
+            "password_hash": password_hash,
+            "role": "comprador",
+            "status": "ativo",
+            "picture": None,
+            "email_verified": False,
+            "token_version": 0,
+            "created_at": utcnow(),
+        }
+        try:
+            await db.users.insert_one(user)
+        except DuplicateKeyError:
+            user = await db.users.find_one({"email": email}, {"_id": 0})
+
+    raw_token = None
+    action = 'registration_notice'
+    if user and not _email_verified(user):
+        await db.users.update_one(
+            {'id': user['id'], 'email_verified': {'$ne': True}},
+            {'$set': {'name': input.name.strip(), 'password_hash': password_hash}},
+        )
+        user = {**user, 'name': input.name.strip(), 'password_hash': password_hash}
+        raw_token = await _create_email_verification(user, input.name.strip(), password_hash)
+        action = 'verify_email'
+    delivered = await deliver_auth_email(action, email, token=raw_token, expires_in_seconds=1800 if raw_token else None)
+    if not delivered:
+        if raw_token:
+            await db.email_verification_tokens.delete_one({'token': hashlib.sha256(raw_token.encode()).hexdigest()})
+        raise HTTPException(503, 'Confirmação por e-mail indisponível. Tente novamente mais tarde.')
+    audit_event('EMAIL_VERIFICATION_SENT', target_id=subject_hash(email), outcome='accepted')
+    return MessageOut(message=GENERIC_REGISTRATION_MESSAGE)
+
+
+@router.post('/verify-email', response_model=MessageOut)
+async def verify_email(input: EmailVerificationIn, request: Request) -> MessageOut:
+    await _rate_limit(request, 'verify-email', maximum=10)
+    digest = hashlib.sha256(input.token.encode()).hexdigest()
+    candidate = await db.email_verification_tokens.find_one({
+        'token': digest,
+        'used': False,
+        'expires_at': {'$gt': utcnow()},
+    }, {'_id': 0})
+    if not candidate or not await _verify_password(input.password, candidate.get('pending_password_hash')):
+        raise HTTPException(400, 'Código de confirmação inválido ou expirado.')
+
+    async def confirm(session):
+        token = await db.email_verification_tokens.find_one({
+            'token': digest,
+            'used': False,
+            'expires_at': {'$gt': utcnow()},
+        }, session=session)
+        if not token:
+            raise HTTPException(400, 'Código de confirmação inválido ou expirado.')
+        updated = await db.users.update_one(
+            {'id': token['user_id'], 'email': token['email'], 'email_verified': {'$ne': True}},
+            {'$set': {
+                'email_verified': True,
+                'email_verified_at': utcnow(),
+                'name': token['pending_name'],
+                'password_hash': token['pending_password_hash'],
+            }, '$inc': {'token_version': 1}},
+            session=session,
+        )
+        if not updated.modified_count:
+            raise HTTPException(400, 'Código de confirmação inválido ou expirado.')
+        await db.email_verification_tokens.update_many(
+            {'user_id': token['user_id'], 'used': False},
+            {'$set': {'used': True, 'used_at': utcnow()}},
+            session=session,
+        )
+        return token['user_id']
+
+    async with await db.client.start_session() as session:
+        user_id = await session.with_transaction(confirm)
+    audit_event('EMAIL_VERIFIED', actor_id=user_id, target_id=user_id)
+    return MessageOut(message='E-mail confirmado. Entre com sua senha.')
+
+
+@router.post('/resend-verification', response_model=MessageOut, status_code=202)
+async def resend_verification(input: ResendVerificationIn, request: Request) -> MessageOut:
+    email = input.email.lower().strip()
+    await _rate_limit(request, 'resend-verification', email, 3)
+    if not email_delivery_configured():
+        raise HTTPException(503, 'Confirmação por e-mail indisponível. Tente novamente mais tarde.')
+    user = await db.users.find_one({'email': email}, {'_id': 0})
+    valid = await _verify_password(input.password, user.get('password_hash') if user else DUMMY_HASH)
+    if user and valid and not _email_verified(user):
+        token = await _create_email_verification(user, user['name'], user['password_hash'])
+        delivered = await deliver_auth_email('verify_email', email, token=token, expires_in_seconds=1800)
+        if not delivered:
+            await db.email_verification_tokens.delete_one({'token': hashlib.sha256(token.encode()).hexdigest()})
+            raise HTTPException(503, 'Confirmação por e-mail indisponível. Tente novamente mais tarde.')
+    return MessageOut(message=GENERIC_VERIFICATION_MESSAGE)
 
 
 @router.post("/login", response_model=UserPublic)
@@ -153,11 +276,14 @@ async def login(input: LoginIn, request: Request, response: Response) -> UserPub
     email = input.email.lower().strip()
     await _rate_limit(request, 'login-source', maximum=50)
     user = await db.users.find_one({"email": email}, {"_id": 0})
-    valid = verify_password(input.password, user.get('password_hash') if user else DUMMY_HASH)
+    valid = await _verify_password(input.password, user.get('password_hash') if user else DUMMY_HASH)
     if not user or not valid or user.get('status') != 'ativo':
         await _rate_limit_login_failure(email)
         audit_event('LOGIN_FAILURE', target_id=subject_hash(email), outcome='invalid_credentials')
         raise HTTPException(status_code=401, detail="E-mail ou senha inválidos.")
+    if not _email_verified(user):
+        audit_event('LOGIN_FAILURE', target_id=user['id'], outcome='email_unverified')
+        raise HTTPException(status_code=403, detail='Confirme seu e-mail antes de entrar.')
     mfa_verified = False
     if user.get('mfa_enabled'):
         mfa_verified = await verify_second_factor(user, input.mfa_code)
@@ -186,6 +312,7 @@ async def refresh(request: Request, response: Response) -> UserPublic:
     if (
         not user
         or user.get("status") != "ativo"
+        or not _email_verified(user)
         or payload.get("tv", 0) != user.get("token_version", 0)
     ):
         raise HTTPException(status_code=401, detail="Sessão expirada.")
@@ -219,14 +346,16 @@ async def me_current(user: dict = Depends(get_current_user)) -> UserPublic:
 
 
 @router.post('/change-password', response_model=MessageOut)
-async def change_password(input: PasswordChangeIn, user: dict = Depends(get_current_user)) -> MessageOut:
-    if not verify_password(input.current_password, user.get('password_hash')):
+async def change_password(input: PasswordChangeIn, request: Request,
+                          user: dict = Depends(get_current_user)) -> MessageOut:
+    await _rate_limit(request, 'change-password', user['id'], 5)
+    if not await _verify_password(input.current_password, user.get('password_hash')):
         raise HTTPException(401, 'Senha atual inválida.')
     if user.get('mfa_enabled') and not await verify_second_factor(user, input.mfa_code):
         raise HTTPException(401, 'Segundo fator inválido.')
     result = await db.users.update_one(
         {'id': user['id'], 'token_version': user.get('token_version', 0)},
-        {'$set': {'password_hash': hash_password(input.new_password)}, '$inc': {'token_version': 1}},
+        {'$set': {'password_hash': await _hash_password(input.new_password)}, '$inc': {'token_version': 1}},
     )
     if not result.modified_count:
         raise HTTPException(409, 'A conta foi alterada. Entre novamente.')
@@ -238,7 +367,7 @@ async def change_password(input: PasswordChangeIn, user: dict = Depends(get_curr
 async def reauthenticate(input: ReauthenticateIn, request: Request, response: Response,
                          user: dict = Depends(get_current_user)) -> UserPublic:
     await _rate_limit(request, 'reauth', user['email'], 5)
-    if not verify_password(input.password, user.get('password_hash')):
+    if not await _verify_password(input.password, user.get('password_hash')):
         raise HTTPException(401, 'Credenciais inválidas.')
     mfa_verified = False
     if user.get('mfa_enabled'):
@@ -250,12 +379,14 @@ async def reauthenticate(input: ReauthenticateIn, request: Request, response: Re
 
 
 @router.post('/mfa/setup', response_model=MfaSetupOut)
-async def mfa_setup(input: MfaSetupIn, user: dict = Depends(get_current_user)) -> MfaSetupOut:
+async def mfa_setup(input: MfaSetupIn, request: Request,
+                    user: dict = Depends(get_current_user)) -> MfaSetupOut:
+    await _rate_limit(request, 'mfa-sensitive', user['id'], 5)
     if user.get('role') not in {'admin', 'atendente'}:
         raise HTTPException(403, 'MFA de equipe não está disponível para esta conta.')
     if user.get('mfa_enabled'):
         raise HTTPException(409, 'MFA já está ativo.')
-    if not verify_password(input.current_password, user.get('password_hash')):
+    if not await _verify_password(input.current_password, user.get('password_hash')):
         raise HTTPException(401, 'Senha atual inválida.')
     secret = new_secret()
     expires_at = utcnow() + timedelta(minutes=10)
@@ -269,10 +400,12 @@ async def mfa_setup(input: MfaSetupIn, user: dict = Depends(get_current_user)) -
 
 @router.post('/mfa/confirm', response_model=MfaConfirmOut)
 async def mfa_confirm(input: MfaConfirmIn, response: Response,
+                      request: Request,
                       user: dict = Depends(get_current_user)) -> MfaConfirmOut:
+    await _rate_limit(request, 'mfa-sensitive', user['id'], 5)
     if user.get('mfa_enabled'):
         raise HTTPException(409, 'MFA já está ativo.')
-    if not verify_password(input.current_password, user.get('password_hash')):
+    if not await _verify_password(input.current_password, user.get('password_hash')):
         raise HTTPException(401, 'Senha atual inválida.')
     fresh = await db.users.find_one({'id': user['id']}, {'_id': 0})
     expires_at = fresh.get('mfa_pending_expires_at') if fresh else None
@@ -351,7 +484,7 @@ async def _admin_recovery_user(email: str, password: str, token: str) -> tuple[d
         'mfa_admin_recovery_digest': digest,
         'mfa_admin_recovery_expires_at': {'$gt': utcnow()},
     }, {'_id': 0})
-    if not user or not verify_password(password, user.get('password_hash')):
+    if not user or not await _verify_password(password, user.get('password_hash')):
         raise HTTPException(401, 'Invalid recovery credentials.')
     return user, digest
 
@@ -414,10 +547,12 @@ async def complete_admin_mfa_recovery(input: MfaAdminRecoveryCompleteIn,
 
 @router.post('/mfa/disable', response_model=MessageOut)
 async def mfa_disable(input: MfaDisableIn, response: Response,
+                      request: Request,
                       user: dict = Depends(get_current_user)) -> MessageOut:
+    await _rate_limit(request, 'mfa-sensitive', user['id'], 5)
     if os.getenv('MFA_REQUIRED') == 'true' and user.get('role') in {'admin', 'atendente'}:
         raise HTTPException(409, 'MFA é obrigatório para a equipe. Use um processo de recuperação aprovado.')
-    if not verify_password(input.current_password, user.get('password_hash')):
+    if not await _verify_password(input.current_password, user.get('password_hash')):
         raise HTTPException(401, 'Credenciais inválidas.')
     if not await verify_second_factor(user, input.code):
         raise HTTPException(401, 'Credenciais inválidas.')
@@ -433,63 +568,33 @@ async def mfa_disable(input: MfaDisableIn, response: Response,
 
 @router.post("/forgot-password", response_model=MessageOut)
 async def forgot_password(input: ForgotPasswordIn, request: Request) -> MessageOut:
+    started = time.monotonic()
     email = input.email.lower().strip()
     await _rate_limit(request, 'forgot', email, 5)
-    endpoint, secret = os.getenv('RESET_WEBHOOK_URL', ''), os.getenv('RESET_WEBHOOK_TOKEN', '')
-    parsed = urlsplit(endpoint)
-    allowed_hosts = {
-        host.strip().lower().rstrip('.')
-        for host in os.getenv('RESET_WEBHOOK_ALLOWED_HOSTS', '').split(',')
-        if host.strip()
-    }
-    endpoint_host = (parsed.hostname or '').lower().rstrip('.')
-    try:
-        endpoint_port = parsed.port
-    except ValueError:
-        endpoint_port = -1
-    if (
-        parsed.scheme != 'https'
-        or not endpoint_host
-        or endpoint_host not in allowed_hosts
-        or endpoint_port not in (None, 443)
-        or parsed.username
-        or parsed.password
-        or not secret
-    ):
+    if not email_delivery_configured():
         raise HTTPException(503, 'Recuperação por e-mail indisponível. Fale com o administrador.')
     user = await db.users.find_one({"email": email}, {"_id": 0})
-    if not user:
-        # Generic answer — never reveal whether the account exists.
-        return MessageOut(
-            message="Se este e-mail estiver cadastrado, você receberá as instruções de redefinição."
-        )
-    token = secrets.token_urlsafe(48)
-    digest = hashlib.sha256(token.encode()).hexdigest()
-    await db.password_reset_tokens.insert_one(
-        {
+    if user:
+        token = secrets.token_urlsafe(48)
+        digest = hashlib.sha256(token.encode()).hexdigest()
+        await db.password_reset_tokens.insert_one({
             "token": digest,
             "token_version": user.get('token_version', 0),
             "user_id": user["id"],
             "used": False,
             "created_at": utcnow(),
             "expires_at": utcnow() + timedelta(minutes=30),
-        }
-    )
-    try:
-        async with httpx.AsyncClient(timeout=10, follow_redirects=False) as client:
-            resp = await client.post(endpoint, headers={'Authorization': 'Bearer ' + secret},
-                                     json={'email': email, 'token': token, 'site': os.getenv('PUBLIC_ORIGIN', 'http://localhost:3000')})
-            resp.raise_for_status()
-    except Exception:
-        await db.password_reset_tokens.delete_one({'token': digest})
-        logging.getLogger(__name__).error('password_reset_delivery_failed')
+        })
+        if not await deliver_auth_email('reset_password', email, token=token, expires_in_seconds=1800):
+            await db.password_reset_tokens.delete_one({'token': digest})
+    await asyncio.sleep(max(0, MIN_PUBLIC_AUTH_SECONDS - (time.monotonic() - started)))
     return MessageOut(message='Se este e-mail estiver cadastrado, você receberá as instruções de redefinição.')
 
 
 @router.post("/reset-password", response_model=MessageOut)
 async def reset_password(input: ResetPasswordIn, request: Request) -> MessageOut:
     await _rate_limit(request, 'reset')
-    password_hash = hash_password(input.new_password)
+    password_hash = await _hash_password(input.new_password)
     digest = hashlib.sha256(input.token.encode()).hexdigest()
     doc = await db.password_reset_tokens.find_one(
         {'token': digest, 'used': False, 'expires_at': {'$gt': utcnow()}})

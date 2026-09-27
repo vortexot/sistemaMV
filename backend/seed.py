@@ -147,6 +147,8 @@ async def seed() -> None:
                 "role": entry["role"],
                 "status": "ativo",
                 "picture": None,
+                "email_verified": True,
+                "email_verified_at": utcnow(),
                 "token_version": 0,
                 "created_at": utcnow(),
             }

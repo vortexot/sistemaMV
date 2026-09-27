@@ -32,8 +32,14 @@ async def lifespan(app: FastAPI):
         admins = await db.users.count_documents({'role': 'admin', 'status': 'ativo', 'mfa_enabled': True})
         if unready or not admins:
             raise RuntimeError('Production requires MFA on every active staff account and at least one active admin.')
-    yield
-    client.close()
+    reservation_stop = asyncio.Event()
+    reservation_task = asyncio.create_task(orders.reservation_reaper(reservation_stop))
+    try:
+        yield
+    finally:
+        reservation_stop.set()
+        await reservation_task
+        client.close()
 
 
 # Create the main app without a prefix

@@ -135,6 +135,8 @@ async def get_current_user(request: Request) -> dict:
     user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0})
     if not user or user.get("status") != "ativo" or await is_revoked(payload['jti']):
         raise HTTPException(status_code=401, detail="Não autenticado")
+    if user.get('role') == 'comprador' and user.get('email_verified') is not True:
+        raise HTTPException(status_code=403, detail='Confirme seu e-mail antes de continuar.')
     if payload.get("tv", 0) != user.get("token_version", 0):
         raise HTTPException(status_code=401, detail="Sessão revogada. Faça login novamente.")
     request.state.audit_actor = user['id']

@@ -58,7 +58,8 @@ async def secure(monkeypatch):
     users = {}
     for role in ('admin', 'atendente', 'comprador'):
         user = {'id': role, 'name': 'Synthetic ' + role, 'email': role + '@example.com', 'role': role,
-                'status': 'ativo', 'password_hash': TEST_HASH, 'token_version': 0, 'created_at': utcnow()}
+                'status': 'ativo', 'password_hash': TEST_HASH, 'email_verified': True,
+                'token_version': 0, 'created_at': utcnow()}
         await db.users.insert_one(user)
         users[role] = user
     await db.products.insert_one({'id': 'product', 'name': 'Synthetic product', 'sku': 'SYN', 'brand': 'Test', 'category_id': 'cat',
@@ -78,6 +79,25 @@ async def secure(monkeypatch):
 
 def cart(qty=1, key=None):
     return {'idempotency_key': key or str(uuid.uuid4()), 'items': [{'product_id': 'product', 'qty': qty}]}
+
+
+def configure_auth_email(monkeypatch):
+    monkeypatch.setenv('AUTH_EMAIL_WEBHOOK_URL', 'https://reset.test/deliver')
+    monkeypatch.setenv('AUTH_EMAIL_WEBHOOK_TOKEN', 'synthetic-auth-email-token-32-bytes')
+    monkeypatch.setenv('AUTH_EMAIL_WEBHOOK_ALLOWED_HOSTS', 'reset.test')
+
+
+async def test_favorites_follow_public_catalog_visibility(secure):
+    assert (await secure.api.post('/api/favorites/product/toggle', json={}, headers=secure.headers())).status_code == 200
+    assert [row['id'] for row in (await secure.api.get('/api/favorites', headers=secure.headers())).json()] == ['product']
+
+    await secure.db.products.update_one({'id': 'product'}, {'$set': {'active': False}})
+    assert (await secure.api.get('/api/favorites', headers=secure.headers())).json() == []
+    assert (await secure.api.post('/api/favorites/product/toggle', json={}, headers=secure.headers())).status_code == 404
+
+    await secure.db.products.update_one({'id': 'product'}, {'$set': {'active': True, 'archived': True}})
+    assert (await secure.api.get('/api/favorites', headers=secure.headers())).json() == []
+    assert (await secure.api.get('/api/catalog/products/product')).status_code == 404
 
 
 def test_mfa_encryption_key_rotation_window(monkeypatch):
@@ -149,6 +169,90 @@ async def test_reset_webhook_rejects_non_allowlisted_destination(secure, monkeyp
     assert await secure.db.password_reset_tokens.count_documents({}) == 0
 
 
+async def test_registration_requires_single_use_email_verification_and_binds_credentials(secure, monkeypatch):
+    configure_auth_email(monkeypatch)
+    email = 'unverified@example.com'
+    attacker_password = 'Attacker supplied password 42!'
+    owner_password = 'Owner supplied password 42!'
+
+    first = await secure.api.post('/api/auth/register', json={
+        'name': 'Attacker supplied name', 'email': email, 'password': attacker_password,
+    })
+    first_token = secure.delivery[-1]['token']
+    assert first.status_code == 202 and secure.delivery[-1]['action'] == 'verify_email'
+    assert not secure.api.cookies.get('gs_access_token')
+    assert (await secure.api.post('/api/auth/login', json={'email': email, 'password': attacker_password})).status_code == 403
+    pending_user = await secure.db.users.find_one({'email': email}, {'_id': 0})
+    pending_token = security.create_access_token(pending_user)
+    assert (await secure.api.get(
+        '/api/auth/me', headers={'Authorization': 'Bearer ' + pending_token}
+    )).status_code == 403
+
+    second = await secure.api.post('/api/auth/register', json={
+        'name': 'Address Owner', 'email': email, 'password': owner_password,
+    })
+    second_token = secure.delivery[-1]['token']
+    assert second.status_code == 202 and second.json() == first.json() and second_token != first_token
+    assert (await secure.api.post('/api/auth/verify-email', json={
+        'token': first_token, 'password': attacker_password,
+    })).status_code == 400
+    assert (await secure.api.post('/api/auth/verify-email', json={
+        'token': second_token + 'x', 'password': owner_password,
+    })).status_code == 400
+    assert (await secure.api.post('/api/auth/verify-email', json={
+        'token': second_token, 'password': attacker_password,
+    })).status_code == 400
+    assert (await secure.api.post('/api/auth/verify-email', json={
+        'token': second_token, 'password': owner_password,
+    })).status_code == 200
+    assert (await secure.api.post('/api/auth/verify-email', json={
+        'token': second_token, 'password': owner_password,
+    })).status_code == 400
+    assert (await secure.api.post('/api/auth/login', json={'email': email, 'password': attacker_password})).status_code == 401
+    assert (await secure.api.post('/api/auth/login', json={'email': email, 'password': owner_password})).status_code == 200
+    user = await secure.db.users.find_one({'email': email})
+    assert user['email_verified'] is True and user['name'] == 'Address Owner'
+    assert first_token not in str(await secure.db.email_verification_tokens.find({}).to_list(None))
+
+
+async def test_registration_and_resend_do_not_enumerate_accounts(secure, monkeypatch):
+    configure_auth_email(monkeypatch)
+    body = {'name': 'Synthetic Buyer', 'password': PASSWORD}
+    existing = await secure.api.post('/api/auth/register', json={**body, 'email': 'comprador@example.com'})
+    missing = await secure.api.post('/api/auth/register', json={**body, 'email': 'new-buyer@example.com'})
+    assert existing.status_code == missing.status_code == 202
+    assert existing.json() == missing.json()
+
+    known = await secure.api.post('/api/auth/resend-verification', json={
+        'email': 'comprador@example.com', 'password': PASSWORD,
+    })
+    unknown = await secure.api.post('/api/auth/resend-verification', json={
+        'email': 'unknown@example.com', 'password': PASSWORD,
+    })
+    assert known.status_code == unknown.status_code == 202 and known.json() == unknown.json()
+
+
+async def test_email_verification_expiry_and_resend_rate_limit(secure, monkeypatch):
+    configure_auth_email(monkeypatch)
+    payload = {'name': 'Expiring User', 'email': 'expiring@example.com', 'password': PASSWORD}
+    assert (await secure.api.post('/api/auth/register', json=payload)).status_code == 202
+    token = secure.delivery[-1]['token']
+    await secure.db.email_verification_tokens.update_one(
+        {'token': hashlib.sha256(token.encode()).hexdigest()},
+        {'$set': {'expires_at': utcnow() - timedelta(seconds=1)}},
+    )
+    assert (await secure.api.post('/api/auth/verify-email', json={
+        'token': token, 'password': PASSWORD,
+    })).status_code == 400
+    for _ in range(3):
+        assert (await secure.api.post('/api/auth/resend-verification', json={
+            'email': payload['email'], 'password': payload['password'],
+        })).status_code == 202
+    assert (await secure.api.post('/api/auth/resend-verification', json={
+        'email': payload['email'], 'password': payload['password'],
+    })).status_code == 429
+
+
 async def test_refresh_rotation_and_logout_revoke_copied_tokens(secure):
     user = secure.users['comprador']
     access, refresh = security.create_access_token(user), security.create_refresh_token(user)
@@ -211,6 +315,30 @@ async def test_forwarding_headers_do_not_bypass_rate_limit(secure):
     assert response.status_code == 429
 
 
+async def test_change_password_rate_limit_is_per_user_and_recovers_after_window(secure, monkeypatch):
+    clock = [utcnow()]
+    monkeypatch.setattr(auth, 'utcnow', lambda: clock[0])
+    wrong = {'current_password': 'wrong', 'new_password': 'Replacement password 42!'}
+    for index in range(5):
+        response = await secure.api.post(
+            '/api/auth/change-password',
+            json={**wrong, 'new_password': f'Replacement password {index} 42!'},
+            headers={**secure.headers('admin'), 'X-Forwarded-For': f'198.51.100.{index}'},
+        )
+        assert response.status_code == 401
+    assert (await secure.api.post(
+        '/api/auth/change-password', json=wrong, headers=secure.headers('admin')
+    )).status_code == 429
+
+    assert (await secure.api.post(
+        '/api/auth/change-password', json=wrong, headers=secure.headers('comprador')
+    )).status_code == 401
+    clock[0] += timedelta(minutes=15)
+    assert (await secure.api.post(
+        '/api/auth/change-password', json=wrong, headers=secure.headers('admin')
+    )).status_code == 401
+
+
 async def test_retired_google_routes_are_not_exposed(secure):
     assert not security.verify_password('test', None)
     assert (await secure.api.get('/openapi.json')).status_code == 404
@@ -238,12 +366,14 @@ async def test_invalid_financial_fields_and_state(secure):
 
 
 async def test_order_price_ownership_idempotency_and_conflict(secure):
-    request = cart(2)
+    request = {**cart(2), 'fulfillment_method': 'pickup'}
     response = await secure.api.post('/api/orders', json=request, headers=secure.headers())
     assert response.status_code == 200
     order = response.json()
     assert order['total'] == 20.50
+    assert order['fulfillment_method'] == 'pickup'
     assert (await secure.api.post('/api/orders', json=request, headers=secure.headers())).json()['id'] == order['id']
+    assert (await secure.api.post('/api/orders', json={**request, 'fulfillment_method': 'delivery'}, headers=secure.headers())).status_code == 409
     assert (await secure.api.post('/api/orders', json=cart(1, request['idempotency_key']), headers=secure.headers())).status_code == 409
     assert (await secure.db.products.find_one({'id': 'product'}))['stock'] == 3
     for path in ('/api/orders/'+order['id'],):
@@ -251,6 +381,7 @@ async def test_order_price_ownership_idempotency_and_conflict(secure):
     for action in ('capture', 'cancel'):
         assert (await secure.api.post('/api/payments/paypal/'+action, json={'order_id': order['id']}, headers=secure.headers('atendente'))).status_code == 404
     assert (await secure.api.post('/api/orders', json={**cart(), 'total': .01}, headers=secure.headers())).status_code == 422
+    assert (await secure.api.post('/api/orders', json={**cart(), 'fulfillment_method': 'invalid'}, headers=secure.headers())).status_code == 422
 
 
 async def test_order_concurrency_and_repeated_cancel(secure):
@@ -548,6 +679,42 @@ async def test_pending_order_limit_holds_under_concurrency(secure):
     assert sorted(r.status_code for r in responses) == [200]*5 + [409]*2
     assert await secure.db.orders.count_documents({}) == 5
     assert (await secure.db.products.find_one({'id': 'product'}))['stock'] == 15
+
+
+async def test_expired_reservation_releases_stock_once_and_rejects_late_capture(secure, monkeypatch):
+    clock = [utcnow()]
+    monkeypatch.setattr(orders, 'utcnow', lambda: clock[0])
+    await secure.db.products.update_one({'id': 'product'}, {'$set': {'stock': 1}})
+    created = await secure.api.post('/api/orders', json=cart(), headers=secure.headers())
+    assert created.status_code == 200
+    order = created.json()
+    assert order['reservation_expires_at'] is not None
+    assert (await secure.db.products.find_one({'id': 'product'}))['stock'] == 0
+
+    clock[0] += timedelta(minutes=16)
+    results = await asyncio.gather(
+        orders.expire_pending_orders(),
+        orders.expire_pending_orders(),
+    )
+    assert sum(results) == 1
+    assert (await secure.db.products.find_one({'id': 'product'}))['stock'] == 1
+    expired = await secure.db.orders.find_one({'id': order['id']})
+    assert expired['status'] == expired['payment_status'] == 'expirado'
+    assert await orders.expire_pending_orders() == 0
+    assert (await secure.db.products.find_one({'id': 'product'}))['stock'] == 1
+
+    async def forbidden_capture(*_args, **_kwargs):
+        raise AssertionError('Expired orders must never reach PayPal capture')
+
+    monkeypatch.setattr(orders, 'paypal_capture', forbidden_capture)
+    late = await secure.api.post(
+        '/api/payments/paypal/capture', json={'order_id': order['id']}, headers=secure.headers()
+    )
+    assert late.status_code == 409
+
+    replacement = await secure.api.post('/api/orders', json=cart(), headers=secure.headers())
+    assert replacement.status_code == 200
+    assert (await secure.db.products.find_one({'id': 'product'}))['stock'] == 0
 
 
 async def test_false_webhook_has_no_handler(secure):

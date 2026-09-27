@@ -53,3 +53,41 @@ test('login, logout and email recovery use the hardened API contract', async ({ 
   await expect(page.getByTestId('forgot-password-dialog')).not.toBeVisible();
   expect(calls).toContain('/api/auth/reset-password');
 });
+
+test('registration stays unauthenticated until the email token is confirmed', async ({ page }) => {
+  const email = 'new-owner@example.com';
+  const password = 'Synthetic registration password!';
+  let verificationCalls = 0;
+  await page.route('**/api/**', async route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === '/api/auth/me') return route.fulfill({ status: 401, json: { detail: 'Não autenticado' } });
+    if (path === '/api/auth/register') {
+      expect(route.request().postDataJSON()).toEqual({ name: 'Address Owner', email, password });
+      return route.fulfill({ status: 202, json: { message: 'Confira seu e-mail para continuar.' } });
+    }
+    if (path === '/api/auth/verify-email') {
+      verificationCalls += 1;
+      expect(route.request().postDataJSON()).toEqual({ token: 'v'.repeat(48), password });
+      return route.fulfill({ json: { message: 'E-mail confirmado. Entre com sua senha.' } });
+    }
+    if (path === '/api/auth/resend-verification') {
+      expect(route.request().postDataJSON()).toEqual({ email, password });
+      return route.fulfill({ status: 202, json: { message: 'Se aplicável, enviaremos novas instruções.' } });
+    }
+    return route.fulfill({ status: 404, json: { detail: 'Not found' } });
+  });
+
+  await page.goto('/login');
+  await page.getByRole('tab', { name: 'Criar conta' }).click();
+  await page.getByTestId('register-name-input').fill('Address Owner');
+  await page.getByTestId('register-email-input').fill(email);
+  await page.getByTestId('register-password-input').fill(password);
+  await page.getByTestId('register-submit-button').click();
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByTestId('email-verification-panel')).toBeVisible();
+  await page.getByTestId('verification-resend-button').click();
+  await page.getByTestId('verification-token-input').fill('v'.repeat(48));
+  await page.getByTestId('verification-submit-button').click();
+  await expect(page.getByTestId('login-email-input')).toHaveValue(email);
+  expect(verificationCalls).toBe(1);
+});

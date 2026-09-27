@@ -34,6 +34,8 @@ export default function Login() {
   const [regName, setRegName] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
+  const [verificationRequested, setVerificationRequested] = useState(false);
+  const [verificationToken, setVerificationToken] = useState("");
 
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
@@ -59,12 +61,37 @@ export default function Login() {
 
   const registerMutation = useMutation({
     mutationFn: (body: { name: string; email: string; password: string }) =>
-      apiPost<User>("/auth/register", body),
-    onSuccess: async (u) => {
-      await beginSession();
-      toast.success(`Conta criada! Bem-vindo, ${u.name.split(" ")[0]}.`);
-      navigate("/dashboard");
+      apiPost<{ message: string }>("/auth/register", body),
+    onSuccess: (data) => {
+      setVerificationRequested(true);
+      setVerificationToken("");
+      toast.success(data.message);
     },
+    onError: (error) => toast.error(apiErrorMessage(error)),
+  });
+
+  const verificationMutation = useMutation({
+    mutationFn: (token: string) => apiPost<{ message: string }>("/auth/verify-email", {
+      token,
+      password: regPassword,
+    }),
+    onSuccess: (data) => {
+      toast.success(data.message);
+      setLoginEmail(regEmail.trim());
+      setVerificationRequested(false);
+      setVerificationToken("");
+      setRegPassword("");
+      setTab("login");
+    },
+    onError: (error) => toast.error(apiErrorMessage(error)),
+  });
+
+  const resendVerificationMutation = useMutation({
+    mutationFn: () => apiPost<{ message: string }>("/auth/resend-verification", {
+      email: regEmail.trim(),
+      password: regPassword,
+    }),
+    onSuccess: (data) => toast.success(data.message),
     onError: (error) => toast.error(apiErrorMessage(error)),
   });
 
@@ -239,6 +266,7 @@ export default function Login() {
                       data-testid="register-name-input"
                       value={regName}
                       required
+                      disabled={verificationRequested}
                       autoComplete="name"
                       onChange={(e) => setRegName(e.target.value)}
                       className="pl-9"
@@ -257,6 +285,7 @@ export default function Login() {
                       required
                       autoComplete="email"
                       value={regEmail}
+                      disabled={verificationRequested}
                       onChange={(e) => setRegEmail(e.target.value)}
                       className="pl-9"
                       placeholder="voce@email.com"
@@ -275,6 +304,7 @@ export default function Login() {
                       minLength={15}
                       autoComplete="new-password"
                       value={regPassword}
+                      disabled={verificationRequested}
                       onChange={(e) => setRegPassword(e.target.value)}
                       className="pl-9"
                       placeholder="Mínimo 15 caracteres"
@@ -284,11 +314,56 @@ export default function Login() {
                 <Button
                   type="submit"
                   data-testid="register-submit-button"
-                  disabled={registerMutation.isPending}
+                  disabled={registerMutation.isPending || verificationRequested}
                   className="w-full bg-[#DAA520] font-bold uppercase tracking-wide text-[#0B0B0B] hover:bg-[#A07C1B]"
                 >
                   {registerMutation.isPending ? "Criando conta…" : "Criar conta"}
                 </Button>
+                {verificationRequested && (
+                  <div data-testid="email-verification-panel" className="space-y-3 rounded-lg border border-[#DAA520]/30 bg-[#0B0B0B] p-4">
+                    <p className="text-sm text-[#BDBDBD]">
+                      Confira seu e-mail. A conta só poderá entrar depois da confirmação.
+                    </p>
+                    <Label htmlFor="verification-token">Código recebido por e-mail</Label>
+                    <Input
+                      id="verification-token"
+                      data-testid="verification-token-input"
+                      value={verificationToken}
+                      onChange={(event) => setVerificationToken(event.target.value)}
+                      autoComplete="one-time-code"
+                    />
+                    <Button
+                      type="button"
+                      data-testid="verification-submit-button"
+                      disabled={verificationMutation.isPending || verificationToken.trim().length < 32}
+                      onClick={() => verificationMutation.mutate(verificationToken.trim())}
+                      className="w-full"
+                    >
+                      {verificationMutation.isPending ? "Confirmando…" : "Confirmar e-mail"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      data-testid="verification-resend-button"
+                      disabled={resendVerificationMutation.isPending}
+                      onClick={() => resendVerificationMutation.mutate()}
+                      className="w-full"
+                    >
+                      {resendVerificationMutation.isPending ? "Reenviando…" : "Reenviar confirmação"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => {
+                        setVerificationRequested(false);
+                        setVerificationToken("");
+                      }}
+                      className="w-full"
+                    >
+                      Usar outro e-mail
+                    </Button>
+                  </div>
+                )}
               </form>
             </TabsContent>
           </Tabs>

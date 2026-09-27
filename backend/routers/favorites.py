@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from lib.db import db
 from lib.security import get_current_user
 from models.catalog import CatalogProduct
-from routers.catalog import _catalog_product_out, _category_map
+from routers.catalog import _catalog_product_out, _category_map, public_product_filter
 
 router = APIRouter(prefix="/favorites")
 
@@ -19,7 +19,7 @@ async def my_favorites(user: dict = Depends(get_current_user)) -> list[CatalogPr
     ids = [fav["product_id"] for fav in favs]
     if not ids:
         return []
-    docs = await db.products.find({"id": {"$in": ids}}, {"_id": 0}).to_list(200)
+    docs = await db.products.find(public_product_filter(id={"$in": ids}), {"_id": 0}).to_list(200)
     cats = await _category_map()
     by_id = {doc["id"]: doc for doc in docs}
     ordered = [by_id[i] for i in ids if i in by_id]
@@ -28,7 +28,7 @@ async def my_favorites(user: dict = Depends(get_current_user)) -> list[CatalogPr
 
 @router.post("/{product_id}/toggle")
 async def toggle_favorite(product_id: str, user: dict = Depends(get_current_user)) -> dict:
-    product = await db.products.find_one({"id": product_id}, {"_id": 0})
+    product = await db.products.find_one(public_product_filter(id=product_id), {"_id": 0})
     if not product:
         raise HTTPException(status_code=404, detail="Produto não encontrado.")
     existing = await db.favorites.find_one({"user_id": user["id"], "product_id": product_id})

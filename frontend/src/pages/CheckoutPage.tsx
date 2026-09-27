@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, Lock, ShieldCheck, ShoppingBag } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Lock, ShieldCheck, ShoppingBag, Store, Truck } from "lucide-react";
 import { toast } from "sonner";
 
 import { apiErrorMessage, apiGet, apiPost } from "@/lib/api";
@@ -9,7 +9,8 @@ import { publicAsset } from "@/lib/assets";
 import { useCart, cartTotals } from "@/lib/cart";
 import { useSession } from "@/lib/session";
 import { brl } from "@/lib/format";
-import type { Order, PaymentStatus, PaypalApproval } from "@/lib/types";
+import { businessInfo } from "@/lib/site";
+import type { FulfillmentMethod, Order, PaymentStatus, PaypalApproval } from "@/lib/types";
 import { Button, buttonVariants } from "@/components/ui/button";
 import EmptyState from "@/components/shop/EmptyState";
 import ProductImage from "@/components/shop/ProductImage";
@@ -22,6 +23,13 @@ export default function CheckoutPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { subtotal, descontos, total } = cartTotals(items);
   const returnHandled = useRef(false);
+  const [fulfillmentMethod, setFulfillmentMethod] = useState<FulfillmentMethod>(() =>
+    sessionStorage.getItem("mv-fulfillment-method") === "pickup" ? "pickup" : "delivery",
+  );
+
+  useEffect(() => {
+    sessionStorage.setItem("mv-fulfillment-method", fulfillmentMethod);
+  }, [fulfillmentMethod]);
 
   const paymentsQuery = useQuery({
     queryKey: ["payments", "status"],
@@ -34,7 +42,7 @@ export default function CheckoutPage() {
   const paypalFlow = useMutation({
     mutationFn: async () => {
       // 1) our order is created first (status "Pagamento pendente", stock reserved)
-      const fingerprint = JSON.stringify([user?.id, items.map(i => [i.product_id, i.qty]).sort()]);
+      const fingerprint = JSON.stringify([user?.id, fulfillmentMethod, items.map(i => [i.product_id, i.qty]).sort()]);
       const stored = sessionStorage.getItem("mv-checkout");
       let attempt: {fingerprint: string; key: string} | null = null;
       try { attempt = stored ? JSON.parse(stored) : null; } catch { /* discard invalid browser state */ }
@@ -42,6 +50,7 @@ export default function CheckoutPage() {
       sessionStorage.setItem("mv-checkout", JSON.stringify(attempt));
       const order = await apiPost<Order>("/orders", {
         idempotency_key: attempt.key,
+        fulfillment_method: fulfillmentMethod,
         items: items.map((item) => ({ product_id: item.product_id, qty: item.qty })),
       });
       // 2) the PayPal order is created server-side; credentials never touch the browser
@@ -65,6 +74,7 @@ export default function CheckoutPage() {
     mutationFn: (orderId: string) => apiPost<Order>("/payments/paypal/capture", { order_id: orderId }),
     onSuccess: async (order) => {
       sessionStorage.removeItem("mv-checkout");
+      sessionStorage.removeItem("mv-fulfillment-method");
       clear();
       await queryClient.invalidateQueries({ queryKey: ["orders"] });
       toast.success(`Pagamento aprovado! Pedido ${order.number} confirmado.`);
@@ -182,6 +192,79 @@ export default function CheckoutPage() {
               </div>
             ))}
           </div>
+          <fieldset data-testid="fulfillment-method" className="mt-6 border-t border-[#242424] pt-5">
+            <legend className="font-heading text-lg font-bold text-white">Como você quer receber?</legend>
+            <p className="mt-1 text-sm leading-relaxed text-[#BDBDBD]">
+              Escolha a opção antes de pagar online.
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <label
+                data-testid="fulfillment-delivery-option"
+                className={`flex min-h-24 cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors ${
+                  fulfillmentMethod === "delivery"
+                    ? "border-[#DAA520] bg-[#1E1A08]/70"
+                    : "border-[#343434] bg-[#0B0B0B] hover:border-[#666]"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="fulfillment-method"
+                  value="delivery"
+                  checked={fulfillmentMethod === "delivery"}
+                  onChange={() => setFulfillmentMethod("delivery")}
+                  className="mt-1 h-4 w-4 shrink-0 accent-[#DAA520]"
+                />
+                <span>
+                  <span className="flex items-center gap-2 font-bold text-white">
+                    <Truck className="h-5 w-5 text-[#DAA520]" aria-hidden="true" /> Receber em casa
+                  </span>
+                  <span className="mt-1 block text-xs leading-relaxed text-[#BDBDBD]">
+                    Frete e prazo confirmados pela loja.
+                  </span>
+                </span>
+              </label>
+              <label
+                data-testid="fulfillment-pickup-option"
+                className={`flex min-h-24 cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors ${
+                  fulfillmentMethod === "pickup"
+                    ? "border-[#DAA520] bg-[#1E1A08]/70"
+                    : "border-[#343434] bg-[#0B0B0B] hover:border-[#666]"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="fulfillment-method"
+                  value="pickup"
+                  checked={fulfillmentMethod === "pickup"}
+                  onChange={() => setFulfillmentMethod("pickup")}
+                  className="mt-1 h-4 w-4 shrink-0 accent-[#DAA520]"
+                />
+                <span>
+                  <span className="flex items-center gap-2 font-bold text-white">
+                    <Store className="h-5 w-5 text-[#DAA520]" aria-hidden="true" /> Retirar na loja
+                  </span>
+                  <span className="mt-1 block text-xs leading-relaxed text-[#BDBDBD]">
+                    Sem frete. Pague online e retire após a confirmação.
+                  </span>
+                </span>
+              </label>
+            </div>
+            <p className="mt-3 text-sm text-[#BDBDBD]" role="status" aria-live="polite">
+              {fulfillmentMethod === "pickup"
+                ? `Retirada grátis. Aguarde o aviso de pedido pronto antes de ir à loja.${businessInfo.address ? ` Local: ${businessInfo.address}.` : ""}`
+                : "A loja confirmará o valor e o prazo do frete antes do envio."}
+            </p>
+            {fulfillmentMethod === "pickup" && businessInfo.mapUrl && (
+              <a
+                href={businessInfo.mapUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 inline-flex min-h-11 items-center font-bold text-[#DAA520] hover:underline"
+              >
+                Ver localização da loja
+              </a>
+            )}
+          </fieldset>
           <div className="mt-5 space-y-2 text-sm">
             <div className="flex justify-between text-[#BDBDBD]">
               <span>Subtotal</span>
@@ -195,7 +278,7 @@ export default function CheckoutPage() {
             )}
             <div className="flex justify-between text-[#BDBDBD]">
               <span>Frete</span>
-              <span>Calculado no checkout</span>
+              <span>{fulfillmentMethod === "pickup" ? "Grátis — retirada" : "A confirmar"}</span>
             </div>
             <div className="flex justify-between border-t border-[#242424] pt-3 text-xl font-bold">
               <span className="text-white">Total</span>
@@ -281,7 +364,7 @@ export default function CheckoutPage() {
               </span>
             </div>
             <p className="mt-2 text-xs text-[#BDBDBD]">
-              {items.reduce((sum, i) => sum + i.qty, 0)} item(ns) · Entrega calculada no checkout
+              {items.reduce((sum, i) => sum + i.qty, 0)} item(ns) · {fulfillmentMethod === "pickup" ? "Retirada na loja" : "Entrega a combinar"}
             </p>
           </div>
 

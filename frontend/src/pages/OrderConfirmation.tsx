@@ -3,7 +3,7 @@ import { CheckCircle2, ShoppingBag } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import { brl } from "@/lib/format";
-import type { Order } from "@/lib/types";
+import { FULFILLMENT_METHOD_LABELS, type Order } from "@/lib/types";
 
 interface ConfirmationState {
   order?: Order;
@@ -27,6 +27,11 @@ export default function OrderConfirmation() {
             ? <>Pedido <span className="font-bold text-[#DAA520]">{order.number}</span> confirmado — {brl(order.total)}. Acompanhe o status na sua conta.</>
             : "Acesse sua conta para acompanhar o status dos pedidos confirmados."}
         </p>
+        {order && (
+          <p className="mx-auto mt-3 w-fit rounded-full border border-[#DAA520]/30 bg-[#1E1A08] px-4 py-2 text-sm font-bold text-white">
+            {FULFILLMENT_METHOD_LABELS[order.fulfillment_method ?? "delivery"]}
+          </p>
+        )}
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <Link to="/dashboard" className={buttonVariants()}>
             Ver meus pedidos

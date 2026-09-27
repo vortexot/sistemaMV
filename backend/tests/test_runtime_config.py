@@ -21,6 +21,11 @@ def _production(monkeypatch):
         "MFA_ENCRYPTION_KEY": Fernet.generate_key().decode(),
         "MFA_REQUIRED": "true",
         "PAYMENTS_PAUSED": "true",
+        "AUTH_EMAIL_WEBHOOK_URL": "https://mail.example/deliver",
+        "AUTH_EMAIL_WEBHOOK_TOKEN": "a7f6c4d2e9b1a8f6c4d2e9b1a8f6c4d2",
+        "AUTH_EMAIL_WEBHOOK_ALLOWED_HOSTS": "mail.example",
+        "ORDER_RESERVATION_MINUTES": "15",
+        "ORDER_RESERVATION_REAPER_SECONDS": "60",
     }
     for key, value in values.items():
         monkeypatch.setenv(key, value)
@@ -70,6 +75,11 @@ def test_proxy_wildcard_is_rejected_outside_render_web_service(monkeypatch, serv
         ("JWT_SECRET", "change-me"),
         ("MONGO_URL", "mongodb://127.0.0.1:27017"),
         ("DB_NAME", ""),
+        ("AUTH_EMAIL_WEBHOOK_URL", "http://mail.example/deliver"),
+        ("AUTH_EMAIL_WEBHOOK_TOKEN", "weak"),
+        ("AUTH_EMAIL_WEBHOOK_ALLOWED_HOSTS", "other.example"),
+        ("ORDER_RESERVATION_MINUTES", "0"),
+        ("ORDER_RESERVATION_REAPER_SECONDS", "301"),
     ],
 )
 def test_unsafe_production_configuration_fails_closed(monkeypatch, key, value):

@@ -16,6 +16,7 @@ class UserPublic(BaseModel):
     status: str  # ativo | bloqueado
     picture: str | None = None
     mfa_enabled: bool = False
+    email_verified: bool = False
     created_at: datetime
 
 
@@ -44,6 +45,21 @@ class LoginIn(AuthInput):
 
 class ForgotPasswordIn(AuthInput):
     email: EmailStr
+
+
+class EmailVerificationIn(AuthInput):
+    token: str = Field(min_length=32, max_length=200)
+    password: str = Field(min_length=15, max_length=72)
+
+    @field_validator('password')
+    @classmethod
+    def password_bytes(cls, value):
+        return RegisterIn.password_bytes(value)
+
+
+class ResendVerificationIn(AuthInput):
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=128)
 
 
 class ResetPasswordIn(AuthInput):

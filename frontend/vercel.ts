@@ -33,7 +33,9 @@ export default {
   installCommand: "npm ci --no-audit --no-fund",
   buildCommand: "npm run build",
   outputDirectory: "dist",
-  cleanUrls: true,
+  // The SPA fallback targets the emitted index.html. Vercel clean URLs would
+  // rename that target and make direct visits such as /login return 404.
+  cleanUrls: false,
   trailingSlash: false,
   rewrites: [
     { source: "/api/:path*", destination: `${rawBackendOrigin}/api/:path*` },

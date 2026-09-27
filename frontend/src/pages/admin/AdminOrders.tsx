@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { apiErrorMessage, apiGet, apiPatch } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { useSession } from "@/lib/session";
-import { ORDER_STATUS_LABELS, ORDER_STATUSES, type Order } from "@/lib/types";
+import { FULFILLMENT_METHOD_LABELS, ORDER_STATUS_LABELS, ORDER_STATUSES, type Order } from "@/lib/types";
 import { brl } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,6 +20,7 @@ const STATUS_BADGE: Record<string, string> = {
   em_transito: "bg-sky-500/15 text-sky-400",
   entregue: "bg-emerald-500/15 text-emerald-400",
   cancelado: "bg-red-500/15 text-red-400",
+  expirado: "bg-zinc-500/15 text-zinc-300",
 };
 
 export default function AdminOrders() {
@@ -78,6 +79,7 @@ export default function AdminOrders() {
                 <TableHead>Valor</TableHead>
                 <TableHead>Data</TableHead>
                 <TableHead>Pagamento</TableHead>
+                <TableHead>Recebimento</TableHead>
                 <TableHead>Produtos</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
@@ -94,6 +96,9 @@ export default function AdminOrders() {
                   <TableCell className="text-sm text-[#BDBDBD]">{formatDateTime(order.created_at)}</TableCell>
                   <TableCell className="text-sm text-[#BDBDBD]">
                     {order.payment_method ? `PayPal (${order.payment_status})` : "—"}
+                  </TableCell>
+                  <TableCell className="text-sm font-semibold text-white" data-testid={`order-fulfillment-${order.number}`}>
+                    {FULFILLMENT_METHOD_LABELS[order.fulfillment_method ?? "delivery"]}
                   </TableCell>
                   <TableCell className="max-w-52">
                     <p className="truncate text-sm text-[#BDBDBD]" title={order.items.map((i) => `${i.qty}× ${i.name}`).join(", ")}>

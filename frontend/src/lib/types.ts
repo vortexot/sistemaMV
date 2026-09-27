@@ -9,6 +9,7 @@ export interface User {
   status: string;
   picture: string | null;
   mfa_enabled: boolean;
+  email_verified: boolean;
   created_at: string;
 }
 
@@ -103,6 +104,8 @@ export interface OrderItem {
   qty: number;
 }
 
+export type FulfillmentMethod = "delivery" | "pickup";
+
 export interface Order {
   id: string;
   number: string;
@@ -112,11 +115,14 @@ export interface Order {
   items: OrderItem[];
   items_total: number;
   total: number;
+  fulfillment_method: FulfillmentMethod;
   status: string;
   payment_method: string | null;
   payment_status: string;
   paypal_order_id: string | null;
   paid_at: string | null;
+  reservation_expires_at: string | null;
+  expired_at: string | null;
   created_at: string;
 }
 
@@ -198,9 +204,15 @@ export const ORDER_STATUS_LABELS: Record<string, string> = {
   em_transito: "Em trânsito",
   entregue: "Entregue",
   cancelado: "Cancelado",
+  expirado: "Reserva expirada",
 };
 
 export const ORDER_STATUSES = Object.keys(ORDER_STATUS_LABELS);
+
+export const FULFILLMENT_METHOD_LABELS: Record<FulfillmentMethod, string> = {
+  delivery: "Receber em casa",
+  pickup: "Retirar na loja",
+};
 
 export const TAG_LABELS: Record<string, string> = {
   novo: "NOVO",

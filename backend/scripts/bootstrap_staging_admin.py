@@ -106,6 +106,8 @@ async def provision(generated_output: Path | None = None) -> None:
                 "role": "admin",
                 "status": "ativo",
                 "picture": None,
+                "email_verified": True,
+                "email_verified_at": utcnow(),
                 "token_version": 0,
                 "mfa_enabled": True,
                 "mfa_secret": encrypt_secret(secret),

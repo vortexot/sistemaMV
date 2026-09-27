@@ -51,7 +51,11 @@ Variáveis principais estão documentadas em `backend/.env.example`.
 - `PAYMENTS_PAUSED`: mantenha `true` até validar as credenciais e o fluxo PayPal.
 - `PAYPAL_MODE`, `PAYPAL_CLIENT_ID` e `PAYPAL_CLIENT_SECRET`: configuração PayPal.
 - `RESET_WEBHOOK_URL`, `RESET_WEBHOOK_TOKEN` e `RESET_WEBHOOK_ALLOWED_HOSTS`:
-  entrega de recuperação de senha.
+  compatibilidade com a entrega antiga de recuperação de senha.
+- `AUTH_EMAIL_WEBHOOK_URL`, `AUTH_EMAIL_WEBHOOK_TOKEN` e `AUTH_EMAIL_WEBHOOK_ALLOWED_HOSTS`:
+  entrega obrigatória de confirmação e recuperação; veja `EMAIL_VERIFICATION_SETUP.md`.
+- `ORDER_RESERVATION_MINUTES`: duração da reserva de estoque, entre 5 e 60 minutos.
+- `ORDER_RESERVATION_REAPER_SECONDS`: intervalo do processo de expiração, entre 10 e 300 segundos.
 
 Segredos pertencem somente ao backend. Variáveis com prefixo `VITE_` são públicas
 e nunca devem conter chaves, tokens, senhas ou strings de conexão.

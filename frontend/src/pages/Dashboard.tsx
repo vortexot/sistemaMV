@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { apiErrorMessage, apiGet, apiPost } from "@/lib/api";
 import { endSession, useSession } from "@/lib/session";
 import { brl, formatDate } from "@/lib/format";
-import { ORDER_STATUS_LABELS, ROLE_LABELS, type CatalogProduct, type Order } from "@/lib/types";
+import { FULFILLMENT_METHOD_LABELS, ORDER_STATUS_LABELS, ROLE_LABELS, type CatalogProduct, type Order } from "@/lib/types";
 import { Button, buttonVariants } from "@/components/ui/button";
 import EmptyState from "@/components/shop/EmptyState";
 import ProductImage from "@/components/shop/ProductImage";
@@ -19,6 +19,7 @@ const STATUS_BADGE: Record<string, string> = {
   em_transito: "bg-sky-500/15 text-sky-400",
   entregue: "bg-emerald-500/15 text-emerald-400",
   cancelado: "bg-red-500/15 text-red-400",
+  expirado: "bg-zinc-500/15 text-zinc-300",
 };
 
 export default function Dashboard() {
@@ -216,6 +217,9 @@ export default function Dashboard() {
                   </div>
                   <p className="mt-1 text-xs text-[#BDBDBD]">
                     {order.items.length} item(ns) · {formatDate(order.created_at)}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold text-white">
+                    {FULFILLMENT_METHOD_LABELS[order.fulfillment_method ?? "delivery"]}
                   </p>
                   <p className="mt-1 font-bold text-[#DAA520]">{brl(order.total)}</p>
                 </li>

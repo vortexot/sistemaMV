@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -15,6 +16,7 @@ ORDER_STATUS = (
     "em_transito",
     "entregue",
     "cancelado",
+    "expirado",
 )
 
 ORDER_STATUS_LABELS = {
@@ -25,6 +27,7 @@ ORDER_STATUS_LABELS = {
     "em_transito": "Em trânsito",
     "entregue": "Entregue",
     "cancelado": "Cancelado",
+    "expirado": "Reserva expirada",
 }
 
 
@@ -38,6 +41,7 @@ class OrderCreate(BaseModel):
     model_config = ConfigDict(extra='forbid')
     items: list[OrderItemIn] = Field(min_length=1, max_length=100)
     idempotency_key: uuid.UUID
+    fulfillment_method: Literal['delivery', 'pickup'] = 'delivery'
 
 
 class OrderItem(BaseModel):
@@ -59,11 +63,14 @@ class Order(BaseModel):
     items: list[OrderItem] = []
     items_total: float
     total: float
+    fulfillment_method: Literal['delivery', 'pickup'] = 'delivery'
     status: str = "aguardando_pagamento"
     payment_method: str | None = None
     payment_status: str = "aguardando"
     paypal_order_id: str | None = None
     paid_at: datetime | None = None
+    reservation_expires_at: datetime | None = None
+    expired_at: datetime | None = None
     created_at: datetime = Field(default_factory=utcnow)
 
 

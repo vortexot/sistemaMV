@@ -3,11 +3,12 @@ export const SITE_DESCRIPTION =
   "Conheça a coleção de streetwear e roupas esportivas da MV Multimarcas.";
 
 export const FAQ_ITEMS = [
-  ["Como encontro uma peça?", "Use a busca ou filtre a coleção por categoria. Você também pode abrir a vista rápida para consultar detalhes do produto."],
-  ["Como adiciono itens ao carrinho?", "Selecione “Adicionar” no card do produto. A vista rápida mostra as informações e opções cadastradas para cada peça."],
-  ["Onde vejo o valor final?", "O carrinho mostra os itens e o subtotal. As condições de entrega e o total são apresentados antes da confirmação do pagamento."],
-  ["Como acompanho meu pedido?", "Depois de entrar na conta, acesse “Minha conta” para ver o histórico e o status dos pedidos."],
-  ["O que faço se o pagamento não estiver disponível?", "O checkout informa quando o provedor de pagamento estiver indisponível. Nesse caso, tente novamente mais tarde."],
+  ["Como encontro uma peça específica?", "Use a busca por nome, marca ou SKU, ou filtre a coleção por categoria. A vista rápida reúne os detalhes cadastrados sem tirar você da Home."],
+  ["Onde consulto tamanhos e cores?", "Abra a vista rápida do produto. Quando houver tamanhos ou cores cadastrados, eles aparecem nessa área antes de você adicionar a peça ao carrinho."],
+  ["Como confirmo preço e disponibilidade?", "O preço atual, eventuais valores promocionais e a disponibilidade aparecem em cada produto. O carrinho apresenta os itens e o subtotal antes da etapa final."],
+  ["Quando vejo as condições do pedido?", "O checkout apresenta as condições aplicáveis e o valor final antes de qualquer confirmação. Nenhuma condição adicional é presumida na vitrine."],
+  ["Posso comprar online e retirar na loja?", "Sim. No checkout, selecione “Retirar na loja”, conclua o pagamento online e aguarde o aviso de que o pedido está pronto para retirada."],
+  ["Como acompanho meu pedido?", "Depois de entrar na conta, acesse “Minha conta” para consultar o histórico e o status informado para cada pedido."],
 ] as const;
 
 const envValue = (value: string | undefined) => value?.trim() || undefined;

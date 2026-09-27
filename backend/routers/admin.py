@@ -38,7 +38,7 @@ from models.catalog import (
 )
 from models.orders import ORDER_STATUS_LABELS, Order, PaypalCaptureIn
 from routers.catalog import _category_map, _product_out
-from routers.orders import _attach_items, reconcile_payment
+from routers.orders import _attach_items, expire_pending_orders, reconcile_payment
 
 router = APIRouter(prefix="/admin")
 
@@ -349,6 +349,7 @@ async def update_customer(
 # ---------------------------------------------------------------- orders
 @router.get("/orders", response_model=list[Order])
 async def admin_orders(_: dict = Depends(require_roles("admin", "atendente"))) -> list[Order]:
+    await expire_pending_orders()
     docs = await db.orders.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
     return [await _attach_items(doc) for doc in docs]
 

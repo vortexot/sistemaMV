@@ -18,6 +18,15 @@ const NAV_LINKS = [
   { to: "/#destaques", label: "Destaques" },
 ];
 
+const MOBILE_CATEGORIES = [
+  ["Camisas", "camisas"],
+  ["Moletons", "moletons"],
+  ["Tênis", "tenis"],
+  ["Calças", "calcas"],
+  ["Shorts", "shorts"],
+  ["Acessórios", "acessorios"],
+] as const;
+
 export default function Header() {
   const { user } = useSession();
   const { count } = useCart();
@@ -83,7 +92,7 @@ export default function Header() {
       to="/carrinho"
       data-testid="shop-cart-link"
       aria-label="Abrir carrinho"
-      className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#242424] bg-[#151515] text-white transition-colors hover:border-[#DAA520] hover:text-[#DAA520]"
+      className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#242424] bg-[#151515] text-white transition-colors hover:border-[#DAA520] hover:text-[#DAA520] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F0D9A8]"
     >
       <ShoppingBag className="h-5 w-5" />
       {count > 0 && (
@@ -125,10 +134,10 @@ export default function Header() {
   return (
     <header
       data-testid="shop-header"
-      className="fixed inset-x-0 top-0 z-50 border-b border-[#242424] bg-[#0B0B0B]/98 pt-[env(safe-area-inset-top)] shadow-[0_1px_0_rgba(255,255,255,0.02)]"
+      className="fixed inset-x-0 top-0 z-50 border-b border-[#2A2824] bg-[#0B0B0B]/90 pt-[env(safe-area-inset-top)] shadow-[0_1px_0_rgba(255,255,255,0.02)] backdrop-blur-xl"
     >
-      <div className="mx-auto flex h-20 max-w-7xl items-center gap-4 px-4 sm:px-8">
-        <BrandMark testId="header-logo" className="shrink-0 max-[359px]:gap-0 max-[359px]:[&_[data-slot=brand-wordmark]]:hidden" />
+      <div className="mx-auto flex h-[4.25rem] max-w-7xl items-center gap-2 px-3 sm:px-6 md:h-20 md:gap-4 md:px-8">
+        <BrandMark testId="header-logo" className="shrink-0 gap-2 [&_img]:h-9 [&_img]:w-9 md:gap-3 md:[&_img]:h-11 md:[&_img]:w-11 max-[359px]:gap-0 max-[359px]:[&_[data-slot=brand-wordmark]]:hidden" />
 
         <nav className="ml-2 hidden items-center gap-7 xl:flex" data-testid="header-nav-desktop">
           {NAV_LINKS.map((link) => (
@@ -152,48 +161,72 @@ export default function Header() {
             type="button"
             data-testid="shop-search-toggle"
             aria-label="Buscar peças"
+            aria-expanded={mobileSearchOpen}
+            aria-controls="mobile-header-search"
             onClick={() => setMobileSearchOpen((v) => !v)}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#242424] bg-[#151515] text-white transition-colors hover:border-[#DAA520] hover:text-[#DAA520] md:hidden"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#242424] bg-[#151515] text-white transition-colors hover:border-[#DAA520] hover:text-[#DAA520] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F0D9A8] md:hidden"
           >
             <Search className="h-5 w-5" />
           </button>
           {cartBadge}
           <div className="hidden lg:block">{accountLink}</div>
-          <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+          <Sheet open={menuOpen} onOpenChange={setMenuOpen} modal={true}>
             <SheetTrigger
               render={
                 <button
                   aria-label="Abrir menu"
                   data-testid="header-mobile-menu"
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#242424] bg-[#151515] text-white xl:hidden"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#242424] bg-[#151515] text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F0D9A8] xl:hidden"
                 >
                   <Menu className="h-5 w-5" />
                 </button>
               }
             />
-            <SheetContent side="right" className="border-[#242424] bg-[#0B0B0B] px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))]">
-              <SheetTitle className="font-heading text-lg font-extrabold uppercase tracking-[0.2em] text-white">
-                Menu
-              </SheetTitle>
+            <SheetContent
+              side="right"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="mobile-menu-title"
+              data-testid="mobile-menu-dialog"
+              className="border-[#3A352A] bg-[radial-gradient(circle_at_100%_0%,#30291b_0%,#11110f_34%,#0B0B0B_68%)] px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))] data-[side=right]:w-[calc(100vw-1rem)] data-[side=right]:max-w-[28rem] [&_[data-slot=sheet-close]]:h-11 [&_[data-slot=sheet-close]]:w-11 sm:px-7"
+            >
+              <div className="pr-12">
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#D7B775]">MV / Navegação</p>
+                <SheetTitle id="mobile-menu-title" className="mt-2 font-heading text-3xl font-semibold uppercase tracking-[-0.035em] text-white">
+                  Encontre sua direção.
+                </SheetTitle>
+              </div>
               <div className="mt-5">{searchField("menu-search", "menu-search-input")}</div>
-              <nav className="mt-5 flex flex-col gap-2" data-testid="header-nav-mobile">
-                {NAV_LINKS.map((link) => (
+              <nav className="mt-4 border-y border-[#2A2824] py-2" data-testid="header-nav-mobile">
+                {NAV_LINKS.map((link, index) => (
                   <Link
                     key={link.to}
                     to={link.to}
                     onClick={() => setMenuOpen(false)}
-                    className="flex min-h-11 items-center rounded-lg px-3 py-2.5 text-sm font-semibold uppercase tracking-wider text-[#BDBDBD] transition-colors hover:bg-[#151515] hover:text-[#DAA520]"
+                    className="group flex min-h-12 items-center gap-4 border-b border-[#242424]/70 px-1 py-2.5 last:border-0"
                   >
-                    {link.label}
+                    <span className="text-[9px] tracking-[0.2em] text-[#726C61]">0{index + 1}</span>
+                    <span className="font-heading text-lg font-semibold uppercase tracking-wide text-[#EDE8DE] transition-colors group-hover:text-[#D7B775]">{link.label}</span>
+                    <span aria-hidden="true" className="ml-auto text-[#D7B775] transition-transform group-hover:translate-x-1">↗</span>
                   </Link>
                 ))}
               </nav>
-              <div className="mt-6 space-y-3 border-t border-[#242424] pt-6">
+              <div className="mt-4">
+                <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-[#7E796F]">Categorias</p>
+                <div className="mt-2 grid grid-cols-2 gap-1.5">
+                  {MOBILE_CATEGORIES.map(([label, slug]) => (
+                    <Link key={slug} to={`/?cat=${slug}#colecao`} onClick={() => setMenuOpen(false)} className="flex min-h-11 items-center justify-between border border-[#2A2824] bg-[#151513]/75 px-3 text-[11px] font-bold uppercase tracking-[0.08em] text-[#BDB8AF] transition-colors hover:border-[#D7B775] hover:text-[#D7B775]">
+                      {label}<span aria-hidden="true">→</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2 border-t border-[#2A2824] pt-4">
                 {user ? (
                   <Link
                     to="/dashboard"
                     onClick={() => setMenuOpen(false)}
-                    className="flex items-center gap-2 rounded-lg bg-[#151515] px-3 py-2.5 text-sm font-semibold text-white"
+                    className="col-span-2 flex min-h-11 items-center gap-2 bg-[#151515] px-3 py-2.5 text-sm font-semibold text-white"
                   >
                     <UserRound className="h-4 w-4 text-[#DAA520]" />
                     {user.name}
@@ -204,7 +237,7 @@ export default function Header() {
                     to="/login"
                     onClick={() => setMenuOpen(false)}
                     data-testid="header-mobile-login"
-                    className="flex items-center justify-center gap-2 rounded-lg bg-[#DAA520] px-3 py-2.5 text-sm font-bold uppercase text-[#0B0B0B]"
+                    className="flex min-h-11 items-center justify-center gap-2 bg-[#D7B775] px-3 py-2.5 text-xs font-bold uppercase text-[#0B0B0B]"
                   >
                     <LogIn className="h-4 w-4" /> Entrar
                   </Link>
@@ -212,12 +245,13 @@ export default function Header() {
                 <Link
                   to="/carrinho"
                   onClick={() => setMenuOpen(false)}
-                  className="flex items-center justify-center gap-2 rounded-lg border border-[#242424] px-3 py-2.5 text-sm font-semibold text-white"
+                  className="flex min-h-11 items-center justify-center gap-2 border border-[#3A352A] px-3 py-2.5 text-xs font-semibold text-white"
                 >
                   <ShoppingBag className="h-4 w-4 text-[#DAA520]" /> Carrinho
                   {count > 0 && <span className="text-[#DAA520]">({count})</span>}
                 </Link>
               </div>
+              <p className="mt-auto pt-5 text-[9px] uppercase tracking-[0.24em] text-[#6F6A61]">Vista sua presença. MV Multimarcas.</p>
             </SheetContent>
           </Sheet>
         </div>
@@ -225,7 +259,7 @@ export default function Header() {
 
       {/* busca expandida no mobile */}
       {mobileSearchOpen && (
-        <div className="border-t border-[#242424] px-4 pb-3 pt-3 md:hidden" data-testid="shop-search-mobile">
+        <div id="mobile-header-search" className="border-t border-[#242424] px-3 pb-3 pt-3 sm:px-4 md:hidden" data-testid="shop-search-mobile">
           {searchField("mobile-search", "mobile-search-input", true)}
         </div>
       )}

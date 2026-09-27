@@ -1,5 +1,7 @@
 # Relatório de implantação de staging
 
+> **Atualização de 26/09/2026:** o frontend com a Hero cinematográfica e a correção de autoplay móvel foi publicado no Vercel (`dpl_BMmUjpPmz4zidiUStu8LQesiBezC`, estado `READY`). O vídeo distribuído usa H.264 High Level 4.1, `faststart`, `autoplay muted playsinline` declarativos e arquivos `v2` para invalidar o cache anterior. Em produção, `/` e `/login` retornaram `200`, o MP4 aceitou byte range com `206` e o fluxo móvel real do Playwright passou. O backend Render ainda executa a versão anterior à remediação descrita em `CONFIRMED_VULNERABILITIES_REPORT.md`: `GET /api/auth/verify-email` retorna `404`. Portanto, a confirmação de e-mail do novo frontend só ficará operacional depois de configurar `AUTH_EMAIL_WEBHOOK_URL`, `AUTH_EMAIL_WEBHOOK_TOKEN` e `AUTH_EMAIL_WEBHOOK_ALLOWED_HOSTS` e publicar o backend. Pagamentos permanecem pausados.
+
 Atualizado em 2026-09-23. Este documento não contém credenciais, tokens, connection strings, IPs públicos ou dados reais.
 
 ## Deploy

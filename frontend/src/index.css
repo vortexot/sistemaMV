@@ -51,6 +51,7 @@
 
 /* MV Multimarcas: dark is the brand — the site is dark in both modes. */
 :root {
+    --site-header-height: calc(4.25rem + env(safe-area-inset-top));
     --background: #0B0B0B;
     --foreground: #FFFFFF;
     --card: #151515;
@@ -129,10 +130,16 @@
   html {
     @apply font-sans;
     scrollbar-gutter: stable;
-    scroll-padding-top: calc(5rem + env(safe-area-inset-top));
+    scroll-padding-top: var(--site-header-height);
   }
   body, #root {
     min-height: 100svh;
+  }
+}
+
+@media (min-width: 768px) {
+  :root {
+    --site-header-height: calc(5rem + env(safe-area-inset-top));
   }
 }
 

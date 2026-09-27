@@ -60,8 +60,8 @@ export default function Footer() {
             MV <span className="text-[#DAA520]">Multimarcas</span>
           </p>
           <p className="mt-3 max-w-sm text-sm leading-relaxed text-[#BDBDBD]">
-            Streetwear e roupas esportivas organizados em uma vitrine simples para descobrir,
-            salvar e comprar suas peças.
+            Streetwear e esporte selecionados para quem transforma movimento em presença.
+            Descubra, salve e escolha suas próximas peças.
           </p>
           <p className="mt-4 text-xs uppercase tracking-[0.25em] text-[#DAA520]">
             Vista sua presença.

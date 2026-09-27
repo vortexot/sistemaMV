@@ -12,6 +12,10 @@ from models.catalog import CatalogCategory, CatalogProduct, Product
 router = APIRouter(prefix="/catalog")
 
 
+def public_product_filter(**extra) -> dict:
+    return {"active": True, "archived": False, **extra}
+
+
 async def _category_map() -> dict[str, dict]:
     docs = await db.categories.find({}, {"_id": 0}).to_list(500)
     return {doc["id"]: doc for doc in docs}
@@ -52,7 +56,7 @@ async def list_products(
     search: str | None = Query(default=None),
     featured: bool | None = Query(default=None),
 ) -> list[CatalogProduct]:
-    query: dict = {"active": True, "archived": False}
+    query = public_product_filter()
     if category:
         cat = await db.categories.find_one({"slug": category}, {"_id": 0})
         if not cat:
@@ -75,7 +79,7 @@ async def list_products(
 @router.get("/products/{product_id}", response_model=CatalogProduct)
 async def get_product(product_id: str) -> CatalogProduct:
     doc = await db.products.find_one(
-        {"id": product_id, "active": True, "archived": False}, {"_id": 0}
+        public_product_filter(id=product_id), {"_id": 0}
     )
     if not doc:
         raise HTTPException(status_code=404, detail="Produto não encontrado.")

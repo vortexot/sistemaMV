@@ -45,6 +45,7 @@ INDEXES: dict[str, list[IndexModel]] = {
         IndexModel([("number", ASCENDING)], name="number_unique", unique=True),
         IndexModel([("user_id", ASCENDING), ("created_at", DESCENDING)], name="user_orders"),
         IndexModel([("status", ASCENDING)], name="status_idx"),
+        IndexModel([("status", ASCENDING), ("payment_status", ASCENDING), ("reservation_expires_at", ASCENDING)], name="reservation_expiry"),
     ],
     "order_items": [IndexModel([("order_id", ASCENDING)], name="order_idx")],
     "payments": [IndexModel([("order_id", ASCENDING)], name="order_idx")],
@@ -63,6 +64,11 @@ INDEXES: dict[str, list[IndexModel]] = {
     ],
     "password_reset_tokens": [
         IndexModel([("token", ASCENDING)], name="token_unique", unique=True),
+        IndexModel([("expires_at", ASCENDING)], name="expires_ttl", expireAfterSeconds=0),
+    ],
+    "email_verification_tokens": [
+        IndexModel([("token", ASCENDING)], name="token_unique", unique=True),
+        IndexModel([("user_id", ASCENDING), ("created_at", DESCENDING)], name="user_created"),
         IndexModel([("expires_at", ASCENDING)], name="expires_ttl", expireAfterSeconds=0),
     ],
     'auth_limits': [IndexModel([('expires_at', ASCENDING)], name='limits_ttl', expireAfterSeconds=0)],

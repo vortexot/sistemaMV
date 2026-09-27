@@ -24,11 +24,12 @@ test("homepage exposes indexable metadata and matching FAQ schema", async ({ pag
 
   const schema = await page.locator("#mv-structured-data").textContent();
   expect(schema).toContain('"@type":"FAQPage"');
-  expect(schema).toContain("Como encontro uma peça?");
+  expect(schema).toContain("Como encontro uma peça específica?");
 
-  const hero = page.getByAltText("Modelos em streetwear premium");
+  const hero = page.locator(".cinematic-frame");
   await expect(hero).toHaveAttribute("fetchpriority", "high");
-  await expect(hero).toHaveAttribute("srcset", /640w/);
+  await expect(hero).toHaveAttribute("src", /elevator-v2-final\.webp$/);
+  await expect(hero).toHaveAttribute("width", "1920");
   await expect(page.locator('script[src*="googletagmanager"]')).toHaveCount(0);
 });
 
