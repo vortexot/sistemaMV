@@ -128,9 +128,11 @@ def validate_production_config() -> None:
         problems.append('MFA_REQUIRED=true is required in production')
 
     email_url = os.getenv('AUTH_EMAIL_WEBHOOK_URL', '')
+    email_token = os.getenv('AUTH_EMAIL_WEBHOOK_TOKEN', '')
     email_hosts = os.getenv('AUTH_EMAIL_WEBHOOK_ALLOWED_HOSTS', '')
-    if (not _https_webhook(email_url, email_hosts)
-            or not _strong_secret(os.getenv('AUTH_EMAIL_WEBHOOK_TOKEN', ''))):
+    email_configured = any((email_url, email_token, email_hosts))
+    if ((environment == 'production' or email_configured)
+            and (not _https_webhook(email_url, email_hosts) or not _strong_secret(email_token))):
         problems.append('verified email delivery requires an allowlisted HTTPS webhook and strong token')
 
     try:

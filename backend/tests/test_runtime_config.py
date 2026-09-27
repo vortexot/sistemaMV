@@ -100,6 +100,23 @@ def test_staging_rejects_live_paypal(monkeypatch):
         validate_production_config()
 
 
+def test_staging_can_disable_email_delivery(monkeypatch):
+    _production(monkeypatch)
+    monkeypatch.setenv('APP_ENV', 'staging')
+    monkeypatch.delenv('AUTH_EMAIL_WEBHOOK_URL')
+    monkeypatch.delenv('AUTH_EMAIL_WEBHOOK_TOKEN')
+    monkeypatch.delenv('AUTH_EMAIL_WEBHOOK_ALLOWED_HOSTS')
+    validate_production_config()
+
+
+def test_staging_rejects_partial_email_delivery_configuration(monkeypatch):
+    _production(monkeypatch)
+    monkeypatch.setenv('APP_ENV', 'staging')
+    monkeypatch.delenv('AUTH_EMAIL_WEBHOOK_TOKEN')
+    with pytest.raises(RuntimeError, match='verified email delivery'):
+        validate_production_config()
+
+
 def test_gridfs_storage_does_not_require_filesystem_path(monkeypatch):
     _production(monkeypatch)
     monkeypatch.setenv("STORAGE_BACKEND", "gridfs")
