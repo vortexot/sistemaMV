@@ -95,7 +95,7 @@ export default function AccountSecurity() {
   if (!user) return <Navigate to="/login" replace />;
 
   return (
-    <main className="mx-auto w-full max-w-3xl space-y-6 px-4 py-12 sm:px-8" data-testid="account-security-page">
+    <div className="mx-auto w-full max-w-3xl space-y-6 px-4 py-12 sm:px-8" data-testid="account-security-page">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#DAA520]">Minha conta</p>
         <h1 className="mt-2 font-heading text-3xl font-black uppercase text-white">Segurança</h1>
@@ -145,6 +145,6 @@ export default function AccountSecurity() {
           )}
         </section>
       )}
-    </main>
+    </div>
   );
 }

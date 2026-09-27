@@ -20,12 +20,12 @@ export default function OrderConfirmation() {
           {order ? <CheckCircle2 className="h-8 w-8 text-[#DAA520]" /> : <ShoppingBag className="h-8 w-8 text-[#DAA520]" />}
         </span>
         <h1 className="mt-6 font-heading text-2xl font-black uppercase tracking-tight text-white">
-          {order ? "Pagamento aprovado" : "Pedido confirmado"}
+          {order ? "Pagamento aprovado" : "Consulte seus pedidos"}
         </h1>
         <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-[#BDBDBD]" role="status">
           {order
             ? <>Pedido <span className="font-bold text-[#DAA520]">{order.number}</span> confirmado — {brl(order.total)}. Acompanhe o status na sua conta.</>
-            : "Acesse sua conta para acompanhar o status dos pedidos confirmados."}
+            : "Não há uma confirmação recente neste navegador. Acesse sua conta para consultar seus pedidos com segurança."}
         </p>
         {order && (
           <p className="mx-auto mt-3 w-fit rounded-full border border-[#DAA520]/30 bg-[#1E1A08] px-4 py-2 text-sm font-bold text-white">

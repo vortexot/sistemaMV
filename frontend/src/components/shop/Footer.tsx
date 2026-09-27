@@ -12,7 +12,6 @@ const SHOP_LINKS = [
 const ACCOUNT_LINKS = [
   { to: "/login", label: "Entrar / Criar conta" },
   { to: "/dashboard", label: "Minha conta" },
-  { to: "/admin", label: "Painel administrativo" },
 ];
 
 function FooterLinks({ title, links }: { title: string; links: typeof SHOP_LINKS }) {

@@ -7,15 +7,15 @@
 .cinematic-video { z-index: 2; pointer-events: none; }
 .cinematic-shade { position: absolute; inset: 0; z-index: 3; background: linear-gradient(90deg, rgb(10 10 9 / .72), rgb(10 10 9 / .35) 30%, transparent 58%), linear-gradient(0deg, rgb(10 10 9 / .48), transparent 24%); }
 .cinematic-content { position: relative; z-index: 1; width: min(1280px, 100%); margin: 0 auto; min-height: 100svh; padding: max(130px, 20svh) 32px 140px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; }
-.cinematic-eyebrow { display: flex; align-items: center; gap: 12px; color: #e4d1a6; font-size: 10px; font-weight: 600; letter-spacing: .2em; text-transform: uppercase; }
-.cinematic-eyebrow span { width: 24px; height: 1px; background: #d6b56d; }
+.cinematic-eyebrow { display: flex; align-items: center; gap: 12px; color: #efc45a; font-size: 10px; font-weight: 600; letter-spacing: .2em; text-transform: uppercase; }
+.cinematic-eyebrow span { width: 24px; height: 1px; background: linear-gradient(90deg, #f3ca58, #a55f06); }
 .cinematic-title { margin-top: 28px; font-family: var(--font-heading); font-size: clamp(62px, 6.8vw, 104px); font-weight: 650; line-height: .97; letter-spacing: -.055em; text-transform: uppercase; color: #f7f4ed; }
-.cinematic-title > span { color: #d7b775; }
+.cinematic-title > span { color: #e0a018; background: linear-gradient(110deg, #f6d36d 0%, #e0a018 46%, #b96d07 82%, #efbd3f 100%); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 .cinematic-description { margin-top: 30px; max-width: 370px; font-size: 15px; line-height: 1.85; color: #ded9ce; }
 .cinematic-actions { display: flex; flex-wrap: wrap; gap: 28px; align-items: center; margin-top: 36px; }
 .cinematic-primary, .cinematic-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 20px; min-height: 52px; font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
-.cinematic-primary { padding: 0 24px; color: #0b0b0b; background: #daa520; border: 1px solid #daa520; transition: background .25s, border-color .25s, box-shadow .25s; }
-.cinematic-primary:hover { background: #efc445; border-color: #efc445; box-shadow: 0 6px 26px rgb(218 165 32 / .24); }
+.cinematic-primary { padding: 0 24px; color: #080604; background: linear-gradient(135deg, #f3ca58 0%, #e0a018 40%, #bb7008 74%, #efbd3f 100%); border: 1px solid rgb(255 220 116 / .58); box-shadow: inset 0 1px 0 rgb(255 246 210 / .4), 0 8px 28px rgb(165 95 6 / .18); transition: filter .25s, box-shadow .25s, transform .25s; }
+.cinematic-primary:hover { filter: brightness(1.08) saturate(1.04); box-shadow: inset 0 1px 0 rgb(255 250 225 / .58), 0 10px 32px rgb(224 160 24 / .28); transform: translateY(-1px); }
 .cinematic-primary svg { transition: transform .25s; }
 .cinematic-primary:hover svg { transform: translateX(3px); }
 .cinematic-secondary { color: #f3efe7; border-bottom: 1px solid #c6baa27a; transition: border-color .25s, color .25s; }

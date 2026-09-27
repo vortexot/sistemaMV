@@ -84,14 +84,14 @@ export default function ProductCard({ product, index = 0, variant = "catalog", c
       style={{ animationDelay: `${(index % 4) * 55}ms` }}
       data-testid={`product-card-${product.id}`}
       className={cn(
-        "card-fade group flex min-w-0 flex-col overflow-hidden rounded-xl border border-[#2A2824] bg-[#151515] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-1 hover:border-[#D7B775]/60 hover:shadow-[0_18px_44px_rgba(0,0,0,0.32)]",
-        featureMain && "h-full rounded-none border-[#D7B775]/20 bg-[#11110f]",
-        featureSide && "rounded-none border-[#D7B775]/15 bg-[#181713] lg:grid lg:grid-cols-[0.9fr_1.1fr]",
+        "card-fade group flex min-w-0 flex-col overflow-hidden rounded-xl border border-[#2A2824] bg-[#151515] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-1 hover:border-[#E0A018]/60 hover:shadow-[0_18px_44px_rgba(0,0,0,0.32)]",
+        featureMain && "h-full rounded-none border-[#E0A018]/20 bg-[#11110f]",
+        featureSide && "rounded-none border-[#E0A018]/15 bg-[#181713] lg:grid lg:grid-cols-[0.9fr_1.1fr]",
         className,
       )}
     >
       <div className={cn(
-        "relative overflow-hidden bg-[#E8E2D6]",
+        "brand-product-media relative overflow-hidden",
         variant === "catalog" && "aspect-[4/4.65] sm:aspect-[4/5]",
         featureMain && "aspect-[16/11] min-h-0 lg:flex-1 lg:aspect-auto",
         featureSide && "aspect-[16/11] lg:h-full lg:aspect-auto",
@@ -100,7 +100,7 @@ export default function ProductCard({ product, index = 0, variant = "catalog", c
           fileId={product.image_file_id}
           name={product.name}
           productId={product.id}
-          className="bg-[#E8E2D6] saturate-[.88] contrast-[1.03] [mix-blend-mode:multiply] transition-[filter,transform] duration-700 group-hover:scale-[1.035] group-hover:saturate-100"
+          className="bg-[#E8E2D6] saturate-[.92] contrast-[1.03] transition-[filter,transform] duration-700 group-hover:scale-[1.035] group-hover:saturate-100"
         />
         {product.tag && (
           <span
@@ -119,7 +119,7 @@ export default function ProductCard({ product, index = 0, variant = "catalog", c
           aria-label={isFavorite ? `Remover ${product.name} dos favoritos` : `Adicionar ${product.name} aos favoritos`}
           aria-pressed={isFavorite}
           disabled={favoriteToggle.isPending}
-          className="absolute right-2.5 top-2.5 flex h-10 w-10 items-center justify-center rounded-full bg-[#0B0B0B]/90 transition-colors hover:text-[#D7B775] sm:right-3 sm:top-3 sm:h-11 sm:w-11"
+          className="absolute right-2.5 top-2.5 flex h-10 w-10 items-center justify-center rounded-full border border-[#E0A018]/20 bg-[#080604]/90 transition-colors hover:text-[#E7B84B] sm:right-3 sm:top-3 sm:h-11 sm:w-11"
         >
           <Heart className={isFavorite ? "h-4 w-4 fill-[#DAA520] text-[#DAA520]" : "h-4 w-4 text-white"} />
         </button>
@@ -128,7 +128,7 @@ export default function ProductCard({ product, index = 0, variant = "catalog", c
           data-testid={`quick-view-product-${product.id}`}
           onClick={() => setQuickViewOpen(true)}
           aria-label={`Ver detalhes de ${product.name}`}
-          className="absolute inset-x-2.5 bottom-2.5 flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-[#D7B775]/45 bg-[#0B0B0B]/92 px-2 py-2 text-[11px] font-bold uppercase tracking-wide text-[#D7B775] transition-all duration-300 hover:bg-[#D7B775] hover:text-[#0B0B0B] sm:inset-x-3 sm:bottom-3 sm:gap-2 sm:text-xs md:translate-y-3 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100 md:group-focus-within:translate-y-0 md:group-focus-within:opacity-100"
+          className="brand-gold-hover absolute inset-x-2.5 bottom-2.5 flex min-h-11 items-center justify-center gap-1.5 rounded-md border border-[#E0A018]/45 bg-[#080604]/92 px-2 py-2 text-[11px] font-bold uppercase tracking-wide text-[#E7B84B] transition-all duration-300 sm:inset-x-3 sm:bottom-3 sm:gap-2 sm:text-xs md:translate-y-3 md:opacity-0 md:group-hover:translate-y-0 md:group-hover:opacity-100 md:group-focus-within:translate-y-0 md:group-focus-within:opacity-100"
         >
           <Eye className="h-3.5 w-3.5" /> Vista rápida
         </button>
@@ -140,7 +140,7 @@ export default function ProductCard({ product, index = 0, variant = "catalog", c
         <h3
           data-testid={`product-name-${product.id}`}
           className={cn(
-            "mt-1 line-clamp-2 font-heading text-sm font-bold leading-tight text-white transition-colors group-hover:text-[#D7B775] sm:text-lg",
+            "mt-1 line-clamp-2 font-heading text-sm font-bold leading-tight text-white transition-colors group-hover:text-[#E7B84B] sm:text-lg",
             featureMain && "text-xl sm:text-2xl lg:text-3xl",
             featureSide && "sm:text-xl",
           )}
@@ -148,7 +148,7 @@ export default function ProductCard({ product, index = 0, variant = "catalog", c
           {product.name}
         </h3>
         <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          <span data-testid={`product-price-${product.id}`} className={cn("text-base font-bold text-[#D7B775] sm:text-xl", featureMain && "sm:text-2xl")}>
+          <span data-testid={`product-price-${product.id}`} className={cn("text-base font-bold text-[#E7B84B] sm:text-xl", featureMain && "sm:text-2xl")}>
             {brl(cartUnitPrice(product))}
           </span>
           {product.promo_price && (
@@ -167,7 +167,7 @@ export default function ProductCard({ product, index = 0, variant = "catalog", c
           disabled={!product.in_stock}
           variant="outline"
           className={cn(
-            "mt-3 min-h-11 w-full gap-1.5 border-[#302E29] bg-[#181713] px-2 text-[11px] font-bold uppercase tracking-wide text-white hover:border-[#D7B775] hover:bg-[#D7B775] hover:text-[#0B0B0B] sm:mt-4 sm:gap-2 sm:text-sm",
+            "brand-gold-hover mt-3 min-h-11 w-full gap-1.5 border-[#302E29] bg-[#181713] px-2 text-[11px] font-bold uppercase tracking-wide text-white sm:mt-4 sm:gap-2 sm:text-sm",
             featured && "lg:mt-5",
           )}
         >

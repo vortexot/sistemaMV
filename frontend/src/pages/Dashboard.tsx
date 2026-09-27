@@ -216,7 +216,7 @@ export default function Dashboard() {
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-[#BDBDBD]">
-                    {order.items.length} item(ns) · {formatDate(order.created_at)}
+                    {order.items.length} {order.items.length === 1 ? "item" : "itens"} · {formatDate(order.created_at)}
                   </p>
                   <p className="mt-1 text-xs font-semibold text-white">
                     {FULFILLMENT_METHOD_LABELS[order.fulfillment_method ?? "delivery"]}

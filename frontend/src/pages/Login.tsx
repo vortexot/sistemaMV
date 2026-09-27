@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { Eye, EyeOff, KeyRound, Mail, UserRound } from "lucide-react";
 import { toast } from "sonner";
@@ -22,9 +22,23 @@ import { cn } from "@/lib/utils";
 
 const BRAND_IMAGE = publicAsset("media/editorial-1200.webp");
 
+function InlineFormError({ error, testId }: { error: unknown; testId?: string }) {
+  if (!error) return null;
+  return (
+    <p data-testid={testId} role="alert" className="rounded-lg border border-red-500/35 bg-red-500/10 px-3 py-2 text-sm leading-relaxed text-red-200">
+      {apiErrorMessage(error)}
+    </p>
+  );
+}
+
 export default function Login() {
   const { user } = useSession();
   const navigate = useNavigate();
+  const location = useLocation();
+  const requestedReturn = (location.state as { returnTo?: unknown } | null)?.returnTo;
+  const returnTo = typeof requestedReturn === "string" && requestedReturn.startsWith("/") && !requestedReturn.startsWith("//")
+    ? requestedReturn
+    : null;
   const [tab, setTab] = useState("login");
   const [showPassword, setShowPassword] = useState(false);
 
@@ -45,8 +59,8 @@ export default function Login() {
   const [resetMfaCode, setResetMfaCode] = useState("");
 
   useEffect(() => {
-    if (user) navigate(user.role === "comprador" ? "/dashboard" : "/admin", { replace: true });
-  }, [user, navigate]);
+    if (user) navigate(user.role === "comprador" && returnTo ? returnTo : user.role === "comprador" ? "/dashboard" : "/admin", { replace: true });
+  }, [user, navigate, returnTo]);
 
   const loginMutation = useMutation({
     mutationFn: (body: { email: string; password: string; mfa_code?: string }) =>
@@ -54,7 +68,7 @@ export default function Login() {
     onSuccess: async (u) => {
       await beginSession();
       toast.success(`Bem-vindo de volta, ${u.name.split(" ")[0]}!`);
-      navigate(u.role === "comprador" ? "/dashboard" : "/admin");
+      navigate(u.role === "comprador" && returnTo ? returnTo : u.role === "comprador" ? "/dashboard" : "/admin", { replace: true });
     },
     onError: (error) => toast.error(apiErrorMessage(error)),
   });
@@ -167,7 +181,7 @@ export default function Login() {
             Acompanhe pedidos, favoritos e ofertas exclusivas.
           </p>
 
-          <Tabs value={tab} onValueChange={(value: string) => setTab(value)}>
+          <Tabs value={tab} onValueChange={(value: string) => { setTab(value); setShowPassword(false); }}>
             <TabsList className="w-full" data-testid="login-tabs">
               <TabsTrigger value="login" className="flex-1">Entrar</TabsTrigger>
               <TabsTrigger value="register" className="flex-1">Criar conta</TabsTrigger>
@@ -200,13 +214,9 @@ export default function Login() {
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="login-mfa">Código MFA ou de recuperação (equipe)</Label>
-                  <Input id="login-mfa" data-testid="login-mfa-input" autoComplete="one-time-code" value={loginMfaCode} onChange={(e) => setLoginMfaCode(e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
                   <Label htmlFor="login-password">Senha</Label>
                   <div className="relative">
-                    <KeyRound className="absolute left-3 top-1/2 h-4 w-4 text-[#BDBDBD]" />
+                    <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#BDBDBD]" />
                     <Input
                       id="login-password"
                       data-testid="login-password-input"
@@ -220,13 +230,24 @@ export default function Login() {
                     <button
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
-                      aria-label="Mostrar senha"
+                      aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                      aria-pressed={showPassword}
                       className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-[#BDBDBD] hover:text-[#DAA520]"
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
                 </div>
+                <details className="rounded-lg border border-[#242424] bg-[#0B0B0B]/55 px-3 py-2">
+                  <summary className="min-h-10 cursor-pointer py-2 text-xs font-semibold text-[#BDBDBD]">
+                    Código de segurança da equipe
+                  </summary>
+                  <div className="space-y-1.5 pb-2 pt-2">
+                    <Label htmlFor="login-mfa">Código MFA ou de recuperação</Label>
+                    <Input id="login-mfa" data-testid="login-mfa-input" autoComplete="one-time-code" value={loginMfaCode} onChange={(e) => setLoginMfaCode(e.target.value)} />
+                    <p className="text-xs text-[#BDBDBD]">Preencha somente se sua conta administrativa usa autenticação em duas etapas.</p>
+                  </div>
+                </details>
                 <div className="flex justify-end">
                   <button
                     type="button"
@@ -245,6 +266,7 @@ export default function Login() {
                 >
                   {loginMutation.isPending ? "Entrando…" : "Entrar"}
                 </Button>
+                <InlineFormError error={loginMutation.error} testId="login-error" />
               </form>
             </TabsContent>
 
@@ -308,8 +330,12 @@ export default function Login() {
                       onChange={(e) => setRegPassword(e.target.value)}
                       className="pl-9"
                       placeholder="Mínimo 15 caracteres"
+                      aria-describedby="register-password-help"
                     />
                   </div>
+                  <p id="register-password-help" className="text-xs leading-relaxed text-[#BDBDBD]">
+                    Use pelo menos 15 caracteres. Uma frase longa é mais fácil de lembrar e mais segura.
+                  </p>
                 </div>
                 <Button
                   type="submit"
@@ -319,6 +345,7 @@ export default function Login() {
                 >
                   {registerMutation.isPending ? "Criando conta…" : "Criar conta"}
                 </Button>
+                <InlineFormError error={registerMutation.error} testId="register-error" />
                 {verificationRequested && (
                   <div data-testid="email-verification-panel" className="space-y-3 rounded-lg border border-[#DAA520]/30 bg-[#0B0B0B] p-4">
                     <p className="text-sm text-[#BDBDBD]">
@@ -341,6 +368,7 @@ export default function Login() {
                     >
                       {verificationMutation.isPending ? "Confirmando…" : "Confirmar e-mail"}
                     </Button>
+                    <InlineFormError error={verificationMutation.error} testId="verification-error" />
                     <Button
                       type="button"
                       variant="outline"
@@ -422,6 +450,7 @@ export default function Login() {
                 {forgotMutation.data.message}
               </p>
             )}
+            <InlineFormError error={forgotMutation.error} testId="forgot-error" />
             {recoveryRequested && (
               <div className="space-y-3 rounded-lg border border-[#242424] bg-[#0B0B0B] p-4">
                 <Label htmlFor="reset-token">Código recebido por e-mail</Label>
@@ -452,6 +481,7 @@ export default function Login() {
                 >
                   {resetMutation.isPending ? "Redefinindo…" : "Redefinir senha"}
                 </Button>
+                <InlineFormError error={resetMutation.error} testId="reset-error" />
               </div>
             )}
           </form>

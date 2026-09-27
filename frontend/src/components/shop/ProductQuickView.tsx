@@ -23,6 +23,14 @@ export default function ProductQuickView({ product, open, onOpenChange }: Props)
   const [qty, setQty] = useState(1);
   const [zoomed, setZoomed] = useState(false);
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      setQty(1);
+      setZoomed(false);
+    }
+    onOpenChange(nextOpen);
+  };
+
   const handleAdd = () => {
     add(
       {
@@ -37,12 +45,11 @@ export default function ProductQuickView({ product, open, onOpenChange }: Props)
       qty,
     );
     toast.success(`${product.name} adicionado ao carrinho.`);
-    onOpenChange(false);
-    setQty(1);
+    handleOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         data-testid={`quick-view-dialog-${product.id}`}
         className="overflow-y-auto border-[#242424] bg-[#151515] p-0 sm:max-w-3xl"
@@ -131,7 +138,7 @@ export default function ProductQuickView({ product, open, onOpenChange }: Props)
                 >
                   <Minus className="h-3.5 w-3.5" />
                 </button>
-                <span data-testid={`quick-view-qty-${product.id}`} className="min-w-5 text-center text-sm font-bold text-white">
+                <span data-testid={`quick-view-qty-${product.id}`} aria-live="polite" className="min-w-5 text-center text-sm font-bold text-white">
                   {qty}
                 </span>
                 <button

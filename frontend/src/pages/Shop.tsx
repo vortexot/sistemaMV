@@ -89,7 +89,7 @@ function SectionHeader({
       transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
       className="editorial-heading"
     >
-      <p className={tone === "light" ? "editorial-eyebrow text-[#735A23]" : "editorial-eyebrow text-[#D7B775]"}>{eyebrow}</p>
+      <p className={tone === "light" ? "editorial-eyebrow text-[#5B3408]" : "editorial-eyebrow text-[#E7B84B]"}>{eyebrow}</p>
       <h2 id={id} data-testid={testId} className={`editorial-title ${tone === "light" ? "text-[#171612]" : "text-[#F4F0E8]"}`}>{title}</h2>
       {copy && <p className={tone === "light" ? "editorial-copy text-[#504B42]" : "editorial-copy text-[#AAA69D]"}>{copy}</p>}
     </motion.div>
@@ -182,7 +182,7 @@ function TrustSection() {
   return (
     <section className="render-section trust-section" aria-labelledby="trust-title">
       <div className="trust-shell">
-        <div className="trust-lead"><p className="editorial-eyebrow text-[#D7B775]">Da escolha ao pedido</p><h2 id="trust-title">Clareza em cada etapa.</h2></div>
+        <div className="trust-lead"><p className="editorial-eyebrow text-[#E7B84B]">Da escolha ao pedido</p><h2 id="trust-title">Clareza em cada etapa.</h2></div>
         <div className="trust-grid">{items.map(({ icon: Icon, title, text }, index) => <article key={title} className="trust-item"><span className="trust-number">0{index + 1}</span><Icon aria-hidden="true" /><h3>{title}</h3><p>{text}</p></article>)}</div>
       </div>
     </section>
@@ -338,7 +338,7 @@ export default function Shop() {
             </form>
           </div>
 
-          {(query || activeCategoryName) && <div data-testid={query ? "catalog-search-summary" : undefined} className="collection-summary"><Sparkles aria-hidden="true" /><p>{query ? <><span data-testid="catalog-search-count">{collectionProducts.length}</span> resultado(s) para “<strong>{query}</strong>”</> : <>Exibindo categoria: <strong>{activeCategoryName}</strong></>}</p><button type="button" data-testid={query ? "catalog-search-reset" : "shop-filter-clear"} onClick={() => applyFilters({ q: "", cat: "" })}>Limpar seleção</button></div>}
+          {(query || activeCategoryName) && <div data-testid={query ? "catalog-search-summary" : undefined} className="collection-summary"><Sparkles aria-hidden="true" /><p>{query ? <><span data-testid="catalog-search-count">{collectionProducts.length}</span> {collectionProducts.length === 1 ? "resultado" : "resultados"} para “<strong>{query}</strong>”</> : <>Exibindo categoria: <strong>{activeCategoryName}</strong></>}</p><button type="button" data-testid={query ? "catalog-search-reset" : "shop-filter-clear"} onClick={() => applyFilters({ q: "", cat: "" })}>Limpar seleção</button></div>}
 
           {productsQuery.isLoading ? (
             <div className="catalog-product-grid">{[0, 1, 2, 3, 4, 5, 6, 7].map((index) => <ProductSkeleton key={index} />)}</div>

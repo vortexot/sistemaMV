@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { setHeroPhase, useHeroPhase } from "@/lib/heroIntro";
 import Header from "@/components/shop/Header";
@@ -7,12 +7,20 @@ import PageTransition from "@/components/layout/PageTransition";
 
 export default function PublicLayout() {
   const { pathname } = useLocation();
+  const mainRef = useRef<HTMLElement>(null);
+  const previousPath = useRef(pathname);
   const isHome = pathname === "/";
   const phase = useHeroPhase();
   const introducing = isHome && phase !== "HERO_READY";
   useEffect(() => {
     if (!isHome) setHeroPhase("HERO_READY");
   }, [isHome]);
+  useEffect(() => {
+    if (previousPath.current === pathname) return;
+    previousPath.current = pathname;
+    if (!window.location.hash) window.scrollTo({ top: 0, behavior: "auto" });
+    window.requestAnimationFrame(() => mainRef.current?.focus({ preventScroll: true }));
+  }, [pathname]);
   return (
     <div className={`flex min-h-svh flex-col bg-background ${isHome ? "cinematic-home" : ""}`}>
       <a
@@ -24,7 +32,7 @@ export default function PublicLayout() {
       <div className="cinematic-navigation" inert={introducing} aria-hidden={introducing}>
         <Header />
       </div>
-      <main id="conteudo-principal" className={`flex-1 ${isHome ? "" : "pt-[var(--site-header-height)]"}`} tabIndex={-1}>
+      <main ref={mainRef} id="conteudo-principal" className={`flex-1 ${isHome ? "" : "pt-[var(--site-header-height)]"}`} tabIndex={-1}>
         <PageTransition>
           <Outlet />
         </PageTransition>

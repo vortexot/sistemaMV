@@ -52,26 +52,34 @@
 /* MV Multimarcas: dark is the brand — the site is dark in both modes. */
 :root {
     --site-header-height: calc(4.25rem + env(safe-area-inset-top));
+    --brand-ink: #070503;
+    --brand-ink-soft: #120D06;
+    --brand-gold: #E0A018;
+    --brand-gold-bright: #F2C347;
+    --brand-gold-soft: #E7B84B;
+    --brand-gold-deep: #A55F06;
+    --brand-bronze: #5B3408;
+    --brand-gold-line: rgb(224 160 24 / .32);
     --background: #0B0B0B;
     --foreground: #FFFFFF;
     --card: #151515;
     --card-foreground: #FFFFFF;
     --popover: #151515;
     --popover-foreground: #FFFFFF;
-    --primary: #DAA520;
+    --primary: #E0A018;
     --primary-foreground: #0B0B0B;
     --secondary: #242424;
     --secondary-foreground: #FFFFFF;
     --muted: #242424;
     --muted-foreground: #BDBDBD;
     --accent: #242424;
-    --accent-foreground: #DAA520;
+    --accent-foreground: #E7B84B;
     --destructive: #DC2626;
     --border: #242424;
     --input: #242424;
-    --ring: #DAA520;
-    --chart-1: #DAA520;
-    --chart-2: #A07C1B;
+    --ring: #E0A018;
+    --chart-1: #E0A018;
+    --chart-2: #A55F06;
     --chart-3: #BDBDBD;
     --chart-4: #242424;
     --chart-5: #151515;
@@ -93,20 +101,20 @@
     --card-foreground: #FFFFFF;
     --popover: #151515;
     --popover-foreground: #FFFFFF;
-    --primary: #DAA520;
+    --primary: #E0A018;
     --primary-foreground: #0B0B0B;
     --secondary: #242424;
     --secondary-foreground: #FFFFFF;
     --muted: #242424;
     --muted-foreground: #BDBDBD;
     --accent: #242424;
-    --accent-foreground: #DAA520;
+    --accent-foreground: #E7B84B;
     --destructive: #DC2626;
     --border: #242424;
     --input: #242424;
-    --ring: #DAA520;
-    --chart-1: #DAA520;
-    --chart-2: #A07C1B;
+    --ring: #E0A018;
+    --chart-1: #E0A018;
+    --chart-2: #A55F06;
     --chart-3: #BDBDBD;
     --chart-4: #242424;
     --chart-5: #151515;
@@ -135,6 +143,11 @@
   body, #root {
     min-height: 100svh;
   }
+}
+
+:where(a, button, summary, [role="button"]):focus-visible {
+  outline: 2px solid var(--brand-gold-bright);
+  outline-offset: 3px;
 }
 
 @media (min-width: 768px) {
@@ -180,6 +193,37 @@
   background-image: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.35) 50%, transparent 70%);
   background-size: 200% 100%;
   animation: gold-sheen 3.5s ease-in-out infinite;
+}
+.brand-gold-surface {
+  border-color: rgb(255 219 111 / .48);
+  color: #0b0803;
+  background:
+    linear-gradient(105deg, transparent 20%, rgb(255 244 193 / .34) 43%, transparent 62%),
+    linear-gradient(135deg, #f3ca58 0%, #e0a018 38%, #c47a08 72%, #efbd3f 100%);
+  background-size: 220% 100%, 100% 100%;
+  box-shadow:
+    inset 0 1px 0 rgb(255 245 205 / .42),
+    inset 0 -1px 0 rgb(91 52 8 / .45),
+    0 8px 24px rgb(165 95 6 / .16);
+}
+.brand-gold-surface:hover {
+  color: #070503;
+  background-position: 100% 0, 0 0;
+  box-shadow:
+    inset 0 1px 0 rgb(255 250 225 / .56),
+    inset 0 -1px 0 rgb(91 52 8 / .38),
+    0 10px 30px rgb(224 160 24 / .24);
+}
+.brand-gold-hover:hover {
+  border-color: rgb(242 195 71 / .68);
+  color: #080604;
+  background: linear-gradient(135deg, #f3ca58 0%, #e0a018 42%, #bd7108 76%, #efbd3f 100%);
+  box-shadow: inset 0 1px 0 rgb(255 246 210 / .42), 0 9px 24px rgb(165 95 6 / .2);
+}
+.brand-product-media {
+  background:
+    radial-gradient(circle at 78% 16%, rgb(255 255 255 / .7), transparent 28%),
+    linear-gradient(145deg, #f2eee6 0%, #e4ddd1 100%);
 }
 .page-fade { animation: page-fade .28s cubic-bezier(.22, 1, .36, 1) both; }
 .card-fade { animation: card-fade .42s cubic-bezier(.22, 1, .36, 1) both; }

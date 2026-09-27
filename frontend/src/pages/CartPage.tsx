@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { motion } from "motion/react";
 import { ArrowLeft, Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { buttonVariants } from "@/components/ui/button";
 import EmptyState from "@/components/shop/EmptyState";
@@ -8,8 +9,20 @@ import ProductImage from "@/components/shop/ProductImage";
 import { cartTotals, cartUnitPrice, useCart } from "@/lib/cart";
 
 export default function CartPage() {
-  const { items, setQty, remove } = useCart();
+  const { items, add, setQty, remove } = useCart();
   const { subtotal, descontos, total } = cartTotals(items);
+  const itemCount = items.reduce((sum, item) => sum + item.qty, 0);
+
+  const removeWithUndo = (item: (typeof items)[number]) => {
+    remove(item.product_id);
+    const { qty, ...product } = item;
+    toast(`${item.name} removido do carrinho.`, {
+      action: {
+        label: "Desfazer",
+        onClick: () => add(product, qty),
+      },
+    });
+  };
 
   return (
     <div data-testid="cart-page" className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-8 sm:py-12">
@@ -25,9 +38,10 @@ export default function CartPage() {
         {items.length > 0 && (
           <span
             data-testid="cart-item-count"
+            aria-live="polite"
             className="rounded-full bg-[#DAA520] px-3 py-0.5 text-xs font-bold text-[#0B0B0B]"
           >
-            {items.reduce((sum, i) => sum + i.qty, 0)} item(ns)
+            {itemCount} {itemCount === 1 ? "item" : "itens"}
           </span>
         )}
       </div>
@@ -76,7 +90,7 @@ export default function CartPage() {
                     <button
                       type="button"
                       data-testid={`cart-remove-${item.product_id}`}
-                      onClick={() => remove(item.product_id)}
+                      onClick={() => removeWithUndo(item)}
                       aria-label={`Remover ${item.name}`}
                       className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[#BDBDBD] transition-colors hover:bg-[#242424] hover:text-[#DC2626]"
                     >
@@ -162,7 +176,7 @@ export default function CartPage() {
             <Link
               to="/checkout"
               data-testid="cart-checkout-button"
-              className={`${buttonVariants()} mt-6 w-full animate-glow-pulse justify-center`}
+              className={`${buttonVariants()} mt-6 w-full justify-center`}
             >
               Finalizar compra
             </Link>

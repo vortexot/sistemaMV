@@ -215,7 +215,10 @@ export default function AdminCategories() {
                       <Button
                         type="button"
                         data-testid={`admin-category-delete-${cat.id}`}
-                        onClick={() => remove.mutate(cat)}
+                        onClick={() => {
+                          if (window.confirm(`Excluir a categoria “${cat.name}”? Esta ação não pode ser desfeita.`)) remove.mutate(cat);
+                        }}
+                        disabled={remove.isPending}
                         variant="outline"
                         size="sm"
                         className="hover:border-[#DC2626] hover:text-[#DC2626]"

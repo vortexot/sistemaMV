@@ -156,6 +156,34 @@ test("public purchase journey remains usable across the mobile matrix", async ({
   await expectNoPageOverflow(page);
 });
 
+test("cancelled PayPal flow preserves the cart and explains the recovery path", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const user = { id: "buyer", name: "Cliente Teste", email: "buyer@example.com", role: "comprador", status: "ativo" };
+  await page.route("**/api/**", async (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    if (pathname === "/api/auth/me") return route.fulfill({ json: user });
+    if (pathname === "/api/catalog/products") return route.fulfill({ json: publicProducts });
+    if (pathname === "/api/catalog/categories") return route.fulfill({ json: publicCategories });
+    if (pathname === "/api/payments/status") return route.fulfill({ json: { paypal_configured: true, paypal_mode: "sandbox" } });
+    if (pathname === "/api/orders") return route.fulfill({ json: { id: "order-cancel", number: "MV-1", items: [] } });
+    if (pathname === "/api/payments/paypal/create") {
+      return route.fulfill({ json: { approval_url: "http://localhost:3000/checkout?paypal=cancel&order_id=order-cancel" } });
+    }
+    if (pathname === "/api/payments/paypal/cancel") return route.fulfill({ json: { id: "order-cancel", number: "MV-1", items: [] } });
+    return route.fulfill({ json: [] });
+  });
+
+  await page.goto("/");
+  await expect(page.getByTestId("cinematic-hero")).toHaveAttribute("data-phase", "HERO_READY", { timeout: 15_000 });
+  await page.getByTestId("add-cart-product-mobile-product").first().click();
+  await page.goto("/checkout");
+  await page.getByTestId("paypal-payment-button").first().click();
+
+  await expect(page).toHaveURL(/\/checkout$/);
+  await expect(page.getByTestId("checkout-item-mobile-product")).toBeVisible();
+  await expect(page.getByText("Pagamento cancelado. Seus itens continuam no carrinho.")).toBeVisible();
+});
+
 test("menu, quick view and form remain accessible on a narrow dynamic viewport", async ({ page }) => {
   await stubPublicApi(page);
   await page.setViewportSize({ width: 320, height: 568 });
@@ -207,7 +235,7 @@ test("menu, quick view and form remain accessible on a narrow dynamic viewport",
   await expectNoPageOverflow(page);
 });
 
-test("gold accents and category actions stay visible on a full desktop viewport", async ({ page }) => {
+test("logo-derived gold stays an accent while neutral surfaces and category actions remain visible", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await stubPublicApi(page);
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -216,7 +244,8 @@ test("gold accents and category actions stay visible on a full desktop viewport"
 
   const primaryCta = page.locator(".cinematic-primary");
   await expect(primaryCta).toBeVisible();
-  await expect.poll(() => primaryCta.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(218, 165, 32)");
+  await expect.poll(() => primaryCta.evaluate((element) => getComputedStyle(element).backgroundImage)).toContain("rgb(243, 202, 88)");
+  await expect.poll(() => page.getByTestId("header-login-link").evaluate((element) => getComputedStyle(element).backgroundImage)).toContain("rgb(224, 160, 24)");
 
   const categoryCards = page.locator('[data-testid^="category-card-"]');
   await categoryCards.first().scrollIntoViewIfNeeded();
@@ -229,11 +258,14 @@ test("gold accents and category actions stay visible on a full desktop viewport"
     expect((arrowBox?.y ?? 0) + (arrowBox?.height ?? 0)).toBeLessThanOrEqual((cardBox?.y ?? 0) + (cardBox?.height ?? 0));
   }
 
+  const manifesto = page.locator(".manifesto-section");
+  await manifesto.scrollIntoViewIfNeeded();
+  await expect.poll(() => manifesto.evaluate((element) => getComputedStyle(element).backgroundImage)).toContain("rgb(247, 244, 237)");
+
   const lookbook = page.locator(".lookbook-section");
   await lookbook.scrollIntoViewIfNeeded();
-  await expect.poll(() => lookbook.evaluate((element) => getComputedStyle(element).backgroundImage)).toContain("rgb(233, 226, 211)");
+  await expect.poll(() => lookbook.evaluate((element) => getComputedStyle(element).backgroundImage)).toContain("rgb(247, 244, 237)");
   await expectNoPageOverflow(page);
-  await categoryCards.first().scrollIntoViewIfNeeded();
 });
 
 test("plain Home reload starts at the top without leaving history restoration disabled", async ({ page }) => {

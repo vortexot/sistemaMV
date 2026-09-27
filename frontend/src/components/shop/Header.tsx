@@ -80,7 +80,7 @@ export default function Header() {
       <button
         type="submit"
         data-testid={`${testId}-submit`}
-        className="absolute right-1 top-1 h-10 rounded-md bg-[#DAA520] px-3 text-xs font-bold uppercase tracking-wide text-[#0B0B0B] transition-colors hover:bg-[#A07C1B]"
+        className="brand-gold-surface absolute right-1 top-1 h-10 rounded-md px-3 text-xs font-bold uppercase tracking-wide transition-all"
       >
         Buscar
       </button>
@@ -125,7 +125,7 @@ export default function Header() {
     <Link
       to="/login"
       data-testid="header-login-link"
-      className="flex h-11 items-center gap-2 rounded-lg bg-[#DAA520] px-4 text-sm font-bold uppercase tracking-wide text-[#0B0B0B] transition-colors hover:bg-[#A07C1B]"
+      className="brand-gold-surface flex h-11 items-center gap-2 rounded-lg px-4 text-sm font-bold uppercase tracking-wide transition-all"
     >
       <LogIn className="h-4 w-4" /> Entrar
     </Link>
@@ -134,7 +134,7 @@ export default function Header() {
   return (
     <header
       data-testid="shop-header"
-      className="fixed inset-x-0 top-0 z-50 border-b border-[#2A2824] bg-[#0B0B0B]/90 pt-[env(safe-area-inset-top)] shadow-[0_1px_0_rgba(255,255,255,0.02)] backdrop-blur-xl"
+      className="fixed inset-x-0 top-0 z-50 border-b border-[#DAA520]/25 bg-[#0B0B0B]/94 pt-[env(safe-area-inset-top)] shadow-[0_1px_0_rgba(218,165,32,0.06)] backdrop-blur-xl"
     >
       <div className="mx-auto flex h-[4.25rem] max-w-7xl items-center gap-2 px-3 sm:px-6 md:h-20 md:gap-4 md:px-8">
         <BrandMark testId="header-logo" className="shrink-0 gap-2 [&_img]:h-9 [&_img]:w-9 md:gap-3 md:[&_img]:h-11 md:[&_img]:w-11 max-[359px]:gap-0 max-[359px]:[&_[data-slot=brand-wordmark]]:hidden" />
@@ -191,7 +191,7 @@ export default function Header() {
               className="border-[#3A352A] bg-[radial-gradient(circle_at_100%_0%,#30291b_0%,#11110f_34%,#0B0B0B_68%)] px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-[calc(1.25rem+env(safe-area-inset-top))] data-[side=right]:w-[calc(100vw-1rem)] data-[side=right]:max-w-[28rem] [&_[data-slot=sheet-close]]:h-11 [&_[data-slot=sheet-close]]:w-11 sm:px-7"
             >
               <div className="pr-12">
-                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#D7B775]">MV / Navegação</p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#E7B84B]">MV / Navegação</p>
                 <SheetTitle id="mobile-menu-title" className="mt-2 font-heading text-3xl font-semibold uppercase tracking-[-0.035em] text-white">
                   Encontre sua direção.
                 </SheetTitle>
@@ -206,8 +206,8 @@ export default function Header() {
                     className="group flex min-h-12 items-center gap-4 border-b border-[#242424]/70 px-1 py-2.5 last:border-0"
                   >
                     <span className="text-[9px] tracking-[0.2em] text-[#726C61]">0{index + 1}</span>
-                    <span className="font-heading text-lg font-semibold uppercase tracking-wide text-[#EDE8DE] transition-colors group-hover:text-[#D7B775]">{link.label}</span>
-                    <span aria-hidden="true" className="ml-auto text-[#D7B775] transition-transform group-hover:translate-x-1">↗</span>
+                    <span className="font-heading text-lg font-semibold uppercase tracking-wide text-[#EDE8DE] transition-colors group-hover:text-[#E7B84B]">{link.label}</span>
+                    <span aria-hidden="true" className="ml-auto text-[#E7B84B] transition-transform group-hover:translate-x-1">↗</span>
                   </Link>
                 ))}
               </nav>
@@ -215,7 +215,7 @@ export default function Header() {
                 <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-[#7E796F]">Categorias</p>
                 <div className="mt-2 grid grid-cols-2 gap-1.5">
                   {MOBILE_CATEGORIES.map(([label, slug]) => (
-                    <Link key={slug} to={`/?cat=${slug}#colecao`} onClick={() => setMenuOpen(false)} className="flex min-h-11 items-center justify-between border border-[#2A2824] bg-[#151513]/75 px-3 text-[11px] font-bold uppercase tracking-[0.08em] text-[#BDB8AF] transition-colors hover:border-[#D7B775] hover:text-[#D7B775]">
+                    <Link key={slug} to={`/?cat=${slug}#colecao`} onClick={() => setMenuOpen(false)} className="flex min-h-11 items-center justify-between border border-[#2A2824] bg-[#151513]/80 px-3 text-[11px] font-bold uppercase tracking-[0.08em] text-[#BDB8AF] transition-colors hover:border-[#E0A018] hover:text-[#E7B84B]">
                       {label}<span aria-hidden="true">→</span>
                     </Link>
                   ))}
@@ -237,7 +237,7 @@ export default function Header() {
                     to="/login"
                     onClick={() => setMenuOpen(false)}
                     data-testid="header-mobile-login"
-                    className="flex min-h-11 items-center justify-center gap-2 bg-[#D7B775] px-3 py-2.5 text-xs font-bold uppercase text-[#0B0B0B]"
+                    className="brand-gold-surface flex min-h-11 items-center justify-center gap-2 px-3 py-2.5 text-xs font-bold uppercase"
                   >
                     <LogIn className="h-4 w-4" /> Entrar
                   </Link>

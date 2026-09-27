@@ -91,3 +91,33 @@ test('registration stays unauthenticated until the email token is confirmed', as
   await expect(page.getByTestId('login-email-input')).toHaveValue(email);
   expect(verificationCalls).toBe(1);
 });
+
+test('signing in from checkout returns to the preserved purchase', async ({ page }) => {
+  const user = { id: 'buyer', name: 'Cliente Teste', email: 'buyer@example.com', role: 'comprador', status: 'ativo' };
+  let signedIn = false;
+  await page.addInitScript(() => {
+    localStorage.setItem('gs-cart-v1', JSON.stringify([{
+      product_id: 'product', name: 'Camiseta MV', brand: 'MV', sku: 'MV-1',
+      price: 89.9, promo_price: null, image_file_id: null, qty: 1,
+    }]));
+  });
+  await page.route('**/api/**', async route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === '/api/auth/me') return route.fulfill({ status: signedIn ? 200 : 401, json: signedIn ? user : { detail: 'Não autenticado' } });
+    if (path === '/api/auth/login') {
+      signedIn = true;
+      return route.fulfill({ json: user });
+    }
+    if (path === '/api/payments/status') return route.fulfill({ json: { paypal_configured: true, paypal_mode: 'sandbox' } });
+    return route.fulfill({ json: [] });
+  });
+
+  await page.goto('/checkout');
+  await page.getByTestId('paypal-payment-button').first().click();
+  await expect(page).toHaveURL(/\/login$/);
+  await page.getByTestId('login-email-input').fill(user.email);
+  await page.getByTestId('login-password-input').fill('Synthetic browser password!');
+  await page.getByTestId('login-submit-button').click();
+  await expect(page).toHaveURL(/\/checkout$/);
+  await expect(page.getByTestId('checkout-item-product')).toBeVisible();
+});

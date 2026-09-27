@@ -63,7 +63,6 @@ export default function CheckoutPage() {
       return approval;
     },
     onSuccess: (approval) => {
-      clear();
       // 3) the shopper approves the payment on PayPal itself
       window.location.href = approval.approval_url;
     },
@@ -85,7 +84,10 @@ export default function CheckoutPage() {
 
   const cancelMutation = useMutation({
     mutationFn: (orderId: string) => apiPost<Order>("/payments/paypal/cancel", { order_id: orderId }),
-    onSuccess: () => { sessionStorage.removeItem("mv-checkout"); toast("Pedido cancelado."); },
+    onSuccess: () => {
+      sessionStorage.removeItem("mv-checkout");
+      toast("Pagamento cancelado. Seus itens continuam no carrinho.");
+    },
     onError: (error) => toast.error(apiErrorMessage(error)),
   });
 
@@ -103,11 +105,16 @@ export default function CheckoutPage() {
   const startPayment = () => {
     if (!user) {
       toast("Entre na sua conta para concluir a compra.");
-      navigate("/login");
+      navigate("/login", { state: { returnTo: "/checkout" } });
       return;
     }
     paypalFlow.mutate();
   };
+  const paymentButtonLabel = !user
+    ? "Entrar para concluir a compra"
+    : paypalFlow.isPending
+      ? "Redirecionando…"
+      : `Pagar ${brl(total)} com PayPal`;
 
   if (captureMutation.isPending) {
     return (
@@ -324,12 +331,13 @@ export default function CheckoutPage() {
                   data-testid="paypal-payment-button"
                   disabled={paypalFlow.isPending}
                   onClick={startPayment}
-                  className="w-full animate-glow-pulse bg-[#DAA520] font-bold uppercase tracking-wide text-[#0B0B0B] hover:bg-[#A07C1B]"
+                  aria-busy={paypalFlow.isPending}
+                  className="w-full bg-[#DAA520] font-bold uppercase tracking-wide text-[#0B0B0B] hover:bg-[#A07C1B]"
                 >
-                  {paypalFlow.isPending ? "Redirecionando…" : `Pagar ${brl(total)} com PayPal`}
+                  {paymentButtonLabel}
                 </Button>
                 <p className="text-xs text-[#BDBDBD]">
-                  A cobrança é processada pelo PayPal. Seus dados de pagamento nunca passam por esta loja.
+                  A cobrança é processada pelo PayPal. Seus dados de pagamento nunca passam por esta loja e o carrinho só é esvaziado após a aprovação.
                 </p>
               </div>
             ) : (
@@ -338,7 +346,9 @@ export default function CheckoutPage() {
                   <Lock className="h-4 w-4" /> PayPal indisponível no momento
                 </p>
                 <p className="text-sm leading-relaxed text-[#BDBDBD]" data-testid="paypal-no-charge-message">
-                  O pagamento está temporariamente indisponível. Tente novamente mais tarde.
+                  {paymentsQuery.isError
+                    ? "Não foi possível consultar o serviço de pagamento. Verifique sua conexão e tente novamente."
+                    : "O pagamento está temporariamente indisponível. Tente novamente mais tarde."}
                 </p>
                 <Button
                   type="button"
@@ -348,6 +358,18 @@ export default function CheckoutPage() {
                 >
                   Pagar com PayPal
                 </Button>
+                {paymentsQuery.isError && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => paymentsQuery.refetch()}
+                    disabled={paymentsQuery.isFetching}
+                    aria-busy={paymentsQuery.isFetching}
+                    className="w-full"
+                  >
+                    {paymentsQuery.isFetching ? "Verificando…" : "Tentar verificar novamente"}
+                  </Button>
+                )}
                 <p className="flex items-start gap-2 text-xs text-[#BDBDBD]">
                   <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#DAA520]" />
                   Entre em contato com a loja se precisar de ajuda para concluir seu pedido.
@@ -364,7 +386,7 @@ export default function CheckoutPage() {
               </span>
             </div>
             <p className="mt-2 text-xs text-[#BDBDBD]">
-              {items.reduce((sum, i) => sum + i.qty, 0)} item(ns) · {fulfillmentMethod === "pickup" ? "Retirada na loja" : "Entrega a combinar"}
+              {items.reduce((sum, i) => sum + i.qty, 0)} {items.reduce((sum, i) => sum + i.qty, 0) === 1 ? "item" : "itens"} · {fulfillmentMethod === "pickup" ? "Retirada na loja" : "Entrega a combinar"}
             </p>
           </div>
 
@@ -382,9 +404,10 @@ export default function CheckoutPage() {
             type="button"
             disabled={paypalFlow.isPending}
             onClick={startPayment}
+            aria-busy={paypalFlow.isPending}
             className="mx-auto flex w-full max-w-md bg-[#DAA520] font-bold uppercase tracking-wide text-[#0B0B0B] hover:bg-[#A07C1B]"
           >
-            {paypalFlow.isPending ? "Redirecionando…" : `Pagar ${brl(total)} com PayPal`}
+            {paymentButtonLabel}
           </Button>
         </div>
       )}
