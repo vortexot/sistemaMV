@@ -22,7 +22,7 @@ Por padrão, o sistema consulta PAC (`03298`) e SEDEX (`03220`) e oferece o serv
 
 ## 2. Pagamento Pix manual
 
-O checkout aceita a chave Pix de telefone configurada em `PIX_KEY`. Com `PIX_ENABLED=true`, o cliente autenticado cria o pedido, copia a chave e tem 60 minutos para pagar. O pedido permanece como **aguardando pagamento** até um administrador conferir o extrato e clicar em **Confirmar Pix recebido** no painel.
+O checkout aceita a chave Pix de telefone configurada em `PIX_KEY`. Com `PIX_ENABLED=true`, o cliente autenticado cria o pedido e recebe um QR Code BR Code com o valor exato, identificador do pedido e opção Pix Copia e Cola. O pedido fica reservado por 60 minutos e permanece como **aguardando pagamento** até um administrador conferir o extrato e clicar em **Confirmar Pix recebido** no painel.
 
 Essa confirmação manual não deve ser feita apenas com base em comprovante enviado pelo cliente; confira a entrada real na conta. Para confirmação automática, substitua esse fluxo por uma instituição ou intermediador que ofereça API Pix e webhook de cobrança.
 

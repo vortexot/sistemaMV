@@ -15,6 +15,7 @@ from lib.dates import utcnow, with_utc
 from lib.audit import audit_event
 from lib.paypal import capture_order as paypal_capture, create_order as paypal_create, get_order as paypal_get
 from lib.paypal import paypal_configured, paypal_mode
+from lib.pix import normalize_phone_key, pix_payload
 from lib.shipping import shipping_quote as get_shipping_quote
 from lib.security import get_current_user
 from models.orders import (
@@ -326,6 +327,9 @@ async def create_order(input: OrderCreate, user: dict = Depends(get_current_user
         shipping_fee = money(shipping['fee']) if shipping else Decimal(0)
         total = float(items_total + shipping_fee)
         now = utcnow()
+        pix_txid = ('MV' + order_id.replace('-', ''))[:25].upper() if input.payment_method == 'pix' else None
+        public_pix_key = normalize_phone_key(pix_key()) if input.payment_method == 'pix' else None
+        copy_paste = pix_payload(key=pix_key(), amount=Decimal(str(total)), txid=pix_txid) if pix_txid else None
         order = {'id': order_id, 'number': 'MV-' + order_id, 'user_id': user['id'], 'customer_name': user['name'],
                  'customer_email': user['email'], 'items_total': float(items_total), 'total': total,
                  'fulfillment_method': input.fulfillment_method,
@@ -341,6 +345,7 @@ async def create_order(input: OrderCreate, user: dict = Depends(get_current_user
                      **{key: shipping[key] for key in ('street', 'neighborhood', 'city', 'state')},
                  } if shipping else None,
                  'status': 'aguardando_pagamento', 'payment_method': input.payment_method, 'payment_status': 'aguardando',
+                 'pix_key': public_pix_key, 'pix_copy_paste': copy_paste, 'pix_txid': pix_txid,
                  'paypal_order_id': None, 'created_at': now,
                  'reservation_expires_at': now + reservation_ttl(input.payment_method),
                  'idempotency_key': key, 'request_hash': fingerprint}

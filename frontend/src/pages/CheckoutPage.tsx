@@ -53,7 +53,6 @@ export default function CheckoutPage() {
   const paypalConfigured = paymentsQuery.data?.paypal_configured === true;
   const paypalMode = paymentsQuery.data?.paypal_mode ?? null;
   const pixConfigured = paymentsQuery.data?.pix_configured === true;
-  const pixKey = paymentsQuery.data?.pix_key ?? null;
   const shippingFee = fulfillmentMethod === "delivery" && shippingQuote?.available ? shippingQuote.fee ?? 0 : 0;
   const checkoutTotal = total + shippingFee;
   const deliveryReady = fulfillmentMethod === "pickup" || (shippingQuote?.available === true && !!shippingAddress.number);
@@ -125,7 +124,7 @@ export default function CheckoutPage() {
       sessionStorage.removeItem("mv-fulfillment-method");
       clear();
       await queryClient.invalidateQueries({ queryKey: ["orders"] });
-      navigate("/pedido-confirmado", { replace: true, state: { order, pixKey } });
+      navigate("/pedido-confirmado", { replace: true, state: { order } });
     },
     onError: (error) => toast.error(apiErrorMessage(error)),
   });
@@ -483,7 +482,7 @@ export default function CheckoutPage() {
               </div>
             ) : (
               <div className="mt-5 space-y-5">
-                {pixConfigured && pixKey && (
+                {pixConfigured && (
                   <div className="space-y-3" data-testid="pix-available-area">
                     <p className="text-sm text-emerald-400">
                       Pix disponível — o pedido será reservado por 60 minutos para você realizar a transferência.

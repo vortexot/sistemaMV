@@ -128,6 +128,9 @@ class Order(BaseModel):
     status: str = "aguardando_pagamento"
     payment_method: str | None = None
     payment_status: str = "aguardando"
+    pix_key: str | None = None
+    pix_copy_paste: str | None = None
+    pix_txid: str | None = None
     paypal_order_id: str | None = None
     paid_at: datetime | None = None
     reservation_expires_at: datetime | None = None

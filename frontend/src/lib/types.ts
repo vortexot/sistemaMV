@@ -156,6 +156,9 @@ export interface Order {
   status: string;
   payment_method: string | null;
   payment_status: string;
+  pix_key: string | null;
+  pix_copy_paste: string | null;
+  pix_txid: string | null;
   paypal_order_id: string | null;
   paid_at: string | null;
   reservation_expires_at: string | null;
