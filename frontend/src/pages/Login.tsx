@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
-import { Eye, EyeOff, KeyRound, Mail, UserRound } from "lucide-react";
+import { Eye, EyeOff, KeyRound, Mail, ShieldCheck, UserRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { apiErrorMessage, apiPost } from "@/lib/api";
@@ -40,6 +40,7 @@ export default function Login() {
     ? requestedReturn
     : null;
   const [tab, setTab] = useState("login");
+  const [adminAccess, setAdminAccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const [loginEmail, setLoginEmail] = useState("");
@@ -175,17 +176,21 @@ export default function Login() {
       <div className="flex items-center">
         <div className="w-full rounded-2xl border border-[#242424] bg-[#151515] p-6 sm:p-8">
           <h1 className="font-heading text-2xl font-extrabold uppercase tracking-tight text-white">
-            {tab === "login" ? "Entrar na conta" : "Criar sua conta"}
+            {adminAccess ? "Painel de administrador" : tab === "login" ? "Entrar na conta" : "Criar sua conta"}
           </h1>
           <p className="mt-1 text-sm text-[#BDBDBD]">
-            Acompanhe pedidos, favoritos e ofertas exclusivas.
+            {adminAccess
+              ? "Acesso exclusivo para administradores e equipe autorizada."
+              : "Acompanhe pedidos, favoritos e ofertas exclusivas."}
           </p>
 
           <Tabs value={tab} onValueChange={(value: string) => { setTab(value); setShowPassword(false); }}>
-            <TabsList className="w-full" data-testid="login-tabs">
-              <TabsTrigger value="login" className="flex-1">Entrar</TabsTrigger>
-              <TabsTrigger value="register" className="flex-1">Criar conta</TabsTrigger>
-            </TabsList>
+            {!adminAccess && (
+              <TabsList className="w-full" data-testid="login-tabs">
+                <TabsTrigger value="login" className="flex-1">Entrar</TabsTrigger>
+                <TabsTrigger value="register" className="flex-1">Criar conta</TabsTrigger>
+              </TabsList>
+            )}
 
             <TabsContent value="login">
               <form
@@ -238,16 +243,13 @@ export default function Login() {
                     </button>
                   </div>
                 </div>
-                <details className="rounded-lg border border-[#242424] bg-[#0B0B0B]/55 px-3 py-2">
-                  <summary className="min-h-10 cursor-pointer py-2 text-xs font-semibold text-[#BDBDBD]">
-                    Código de segurança da equipe
-                  </summary>
-                  <div className="space-y-1.5 pb-2 pt-2">
+                {adminAccess && (
+                  <div data-testid="admin-security-field" className="space-y-1.5 rounded-lg border border-[#DAA520]/30 bg-[#0B0B0B]/55 p-3">
                     <Label htmlFor="login-mfa">Código MFA ou de recuperação</Label>
                     <Input id="login-mfa" data-testid="login-mfa-input" autoComplete="one-time-code" value={loginMfaCode} onChange={(e) => setLoginMfaCode(e.target.value)} />
-                    <p className="text-xs text-[#BDBDBD]">Preencha somente se sua conta administrativa usa autenticação em duas etapas.</p>
+                    <p className="text-xs text-[#BDBDBD]">Use o código do autenticador ou um código de recuperação da equipe.</p>
                   </div>
-                </details>
+                )}
                 <div className="flex justify-end">
                   <button
                     type="button"
@@ -396,8 +398,41 @@ export default function Login() {
             </TabsContent>
           </Tabs>
 
-          <p className="mt-6 text-center text-xs text-[#BDBDBD]">
-            Use seus dados de acesso para acompanhar pedidos e favoritos na sua conta.
+          <div className="mt-6 border-t border-[#242424] pt-5">
+            {adminAccess ? (
+              <Button
+                type="button"
+                variant="ghost"
+                data-testid="customer-access-button"
+                onClick={() => {
+                  setAdminAccess(false);
+                  setLoginMfaCode("");
+                  setResetMfaCode("");
+                }}
+                className="w-full text-sm text-[#BDBDBD] hover:text-white"
+              >
+                Voltar para o acesso de cliente
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                data-testid="admin-access-button"
+                onClick={() => {
+                  setAdminAccess(true);
+                  setTab("login");
+                  setShowPassword(false);
+                }}
+                className="w-full gap-2 border-[#DAA520]/35 text-sm text-[#DAA520] hover:border-[#DAA520] hover:bg-[#DAA520]/10 hover:text-[#F0D9A8]"
+              >
+                <ShieldCheck className="h-4 w-4" /> Painel de administrador
+              </Button>
+            )}
+          </div>
+          <p className="mt-4 text-center text-xs text-[#BDBDBD]">
+            {adminAccess
+              ? "O código de segurança é solicitado somente nesta área administrativa."
+              : "Use seus dados de acesso para acompanhar pedidos e favoritos na sua conta."}
           </p>
           <div className="mt-3 text-center">
             <Link to="/" className={cn(buttonVariants({ variant: "link" }), "text-xs text-[#BDBDBD]")}>
@@ -468,10 +503,12 @@ export default function Login() {
                     placeholder="Mínimo 15 caracteres"
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="reset-mfa">Código MFA ou de recuperação (equipe)</Label>
-                  <Input id="reset-mfa" autoComplete="one-time-code" value={resetMfaCode} onChange={(e) => setResetMfaCode(e.target.value)} />
-                </div>
+                {adminAccess && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="reset-mfa">Código MFA ou de recuperação (equipe)</Label>
+                    <Input id="reset-mfa" autoComplete="one-time-code" value={resetMfaCode} onChange={(e) => setResetMfaCode(e.target.value)} />
+                  </div>
+                )}
                 <Button
                   type="button"
                   data-testid="reset-submit-button"
