@@ -126,7 +126,7 @@ O GitHub Pages publica somente uma visualização estática do catálogo. Login,
 pedidos, pagamentos, painel administrativo e uploads exigem o backend completo.
 Consulte `PRODUCTION_SECURITY_REPORT.md` para o estado da preparação de produção.
 Os procedimentos operacionais ficam em `ADMIN_MFA_RECOVERY.md`,
-`PRODUCTION_SECRET_ROTATION.md`, `PAYPAL_SANDBOX_TEST.md` e
+`PRODUCTION_SECRET_ROTATION.md`, `PAYPAL_SANDBOX_TEST.md`, `GO_LIVE_GUIDE.md` e
 `PRODUCTION_INFRA_CHECKLIST.md`; a rastreabilidade ASVS fica em
 `ASVS_SECURITY_MATRIX.md`.
 

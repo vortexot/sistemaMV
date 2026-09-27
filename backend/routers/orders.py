@@ -145,7 +145,7 @@ async def payments_status():
 @router.post('/shipping/quote', response_model=ShippingQuoteOut)
 async def quote_shipping(input: ShippingQuoteIn):
     try:
-        return ShippingQuoteOut(**await get_shipping_quote(input.postal_code))
+        return ShippingQuoteOut(**await get_shipping_quote(input.postal_code, input.quantity))
     except ValueError as error:
         raise HTTPException(422, str(error))
     except RuntimeError as error:
@@ -255,21 +255,21 @@ async def reconcile_payment(order: dict, actor_id: str | None = None) -> dict:
 async def create_order(input: OrderCreate, user: dict = Depends(get_current_user)):
     available()
     await expire_pending_orders()
+    quantities = {}
+    for item in input.items:
+        quantities[item.product_id] = quantities.get(item.product_id, 0) + item.qty
+    if any(qty > 99 for qty in quantities.values()):
+        raise HTTPException(422, 'Limite de 99 unidades por produto.')
     shipping = None
     if input.fulfillment_method == 'delivery':
         try:
-            shipping = await get_shipping_quote(input.shipping_address.postal_code)
+            shipping = await get_shipping_quote(input.shipping_address.postal_code, sum(quantities.values()))
         except ValueError as error:
             raise HTTPException(422, str(error))
         except RuntimeError as error:
             raise HTTPException(503, str(error))
         if not shipping['available']:
             raise HTTPException(503, 'A cotação pelos Correios ainda não está disponível. Escolha retirada na loja.')
-    quantities = {}
-    for item in input.items:
-        quantities[item.product_id] = quantities.get(item.product_id, 0) + item.qty
-    if any(qty > 99 for qty in quantities.values()):
-        raise HTTPException(422, 'Limite de 99 unidades por produto.')
     request_fingerprint = {
         'items': quantities,
         'fulfillment_method': input.fulfillment_method,
@@ -315,6 +315,9 @@ async def create_order(input: OrderCreate, user: dict = Depends(get_current_user
                  'shipping_method': shipping['method'] if shipping else None,
                  'shipping_distance_km': shipping['distance_km'] if shipping else None,
                  'shipping_origin': shipping['origin_store'] if shipping else None,
+                 'shipping_service_code': shipping.get('service_code') if shipping else None,
+                 'shipping_service_name': shipping.get('service_name') if shipping else None,
+                 'shipping_delivery_days': shipping.get('delivery_days') if shipping else None,
                  'shipping_address': {
                      **input.shipping_address.model_dump(),
                      **{key: shipping[key] for key in ('street', 'neighborhood', 'city', 'state')},

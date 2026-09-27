@@ -42,6 +42,34 @@ services:
         value: "true"
       - key: PAYPAL_MODE
         value: sandbox
+      - key: CORREIOS_ENABLED
+        value: "false"
+      - key: CORREIOS_ENV
+        value: homologation
+      - key: CORREIOS_USERNAME
+        sync: false
+      - key: CORREIOS_API_CODE
+        sync: false
+      - key: CORREIOS_ACCESS_TOKEN
+        sync: false
+      - key: CORREIOS_POSTING_CARD
+        sync: false
+      - key: CORREIOS_CONTRACT
+        sync: false
+      - key: CORREIOS_DR
+        sync: false
+      - key: CORREIOS_SERVICE_CODES
+        value: 03298,03220
+      - key: CORREIOS_ORIGIN_POSTAL_CODE
+        value: "72871059"
+      - key: CORREIOS_ITEM_WEIGHT_GRAMS
+        value: "500"
+      - key: CORREIOS_PACKAGE_LENGTH_CM
+        value: "30"
+      - key: CORREIOS_PACKAGE_WIDTH_CM
+        value: "25"
+      - key: CORREIOS_PACKAGE_HEIGHT_CM
+        value: "10"
       - key: AUTH_EMAIL_WEBHOOK_URL
         sync: false
       - key: AUTH_EMAIL_WEBHOOK_TOKEN

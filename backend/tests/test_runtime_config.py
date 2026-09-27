@@ -117,6 +117,23 @@ def test_staging_rejects_partial_email_delivery_configuration(monkeypatch):
         validate_production_config()
 
 
+def test_enabled_correios_requires_credentials(monkeypatch):
+    _production(monkeypatch)
+    monkeypatch.setenv('CORREIOS_ENABLED', 'true')
+    monkeypatch.setenv('CORREIOS_ENV', 'production')
+    with pytest.raises(RuntimeError, match='Correios requires'):
+        validate_production_config()
+
+
+def test_staging_accepts_correios_homologation_token(monkeypatch):
+    _production(monkeypatch)
+    monkeypatch.setenv('APP_ENV', 'staging')
+    monkeypatch.setenv('CORREIOS_ENABLED', 'true')
+    monkeypatch.setenv('CORREIOS_ENV', 'homologation')
+    monkeypatch.setenv('CORREIOS_ACCESS_TOKEN', 'delegated-test-token')
+    validate_production_config()
+
+
 def test_gridfs_storage_does_not_require_filesystem_path(monkeypatch):
     _production(monkeypatch)
     monkeypatch.setenv("STORAGE_BACKEND", "gridfs")

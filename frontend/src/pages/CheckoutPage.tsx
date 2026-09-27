@@ -56,7 +56,10 @@ export default function CheckoutPage() {
   const deliveryReady = fulfillmentMethod === "pickup" || (shippingQuote?.available === true && !!shippingAddress.number);
 
   const shippingMutation = useMutation({
-    mutationFn: () => apiPost<ShippingQuote>("/shipping/quote", { postal_code: shippingAddress.postal_code }),
+    mutationFn: () => apiPost<ShippingQuote>("/shipping/quote", {
+      postal_code: shippingAddress.postal_code,
+      quantity: items.reduce((sum, item) => sum + item.qty, 0),
+    }),
     onSuccess: setShippingQuote,
     onError: (error) => {
       setShippingQuote(null);
@@ -315,7 +318,7 @@ export default function CheckoutPage() {
               <div className="mt-5 rounded-xl border border-[#343434] bg-[#0B0B0B] p-4">
                 <h3 className="font-bold text-white">Endereço de entrega</h3>
                 <p className="mt-1 text-xs leading-relaxed text-[#BDBDBD]">
-                  Em Valparaíso e Luziânia, o motoboy custa R$ 9 de saída + R$ 4 por km, limitado a R$ 50.
+                  No DF e nos municípios do Entorno, o motoboy custa R$ 9 de saída + R$ 4 por km, limitado a R$ 50. Para outras regiões, calculamos pelos Correios.
                 </p>
                 <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
                   <label className="text-sm font-bold text-white">
@@ -346,13 +349,19 @@ export default function CheckoutPage() {
                     <p className="text-sm font-bold text-white">
                       {shippingQuote.street}{shippingQuote.neighborhood ? `, ${shippingQuote.neighborhood}` : ""} — {shippingQuote.city}/{shippingQuote.state}
                     </p>
-                    {shippingQuote.available ? (
+                    {shippingQuote.available && shippingQuote.method === "motoboy" ? (
                       <p data-testid="motoboy-quote" className="mt-1 text-sm text-emerald-400">
                         Motoboy da unidade {shippingQuote.origin_store}: aproximadamente {shippingQuote.distance_km?.toFixed(1)} km · {brl(shippingQuote.fee ?? 0)}
                       </p>
+                    ) : shippingQuote.available ? (
+                      <p data-testid="correios-quote" className="mt-1 text-sm text-emerald-400">
+                        Correios {shippingQuote.service_name}
+                        {shippingQuote.delivery_days ? ` · até ${shippingQuote.delivery_days} dias úteis` : ""}
+                        {` · ${brl(shippingQuote.fee ?? 0)}`}
+                      </p>
                     ) : (
                       <p className="mt-1 text-sm text-[#DAA520]">
-                        Fora da rota local de motoboy. A cotação dos Correios ainda precisa ser configurada pela loja.
+                        Fora da rota regional de motoboy. A cotação dos Correios aguarda as credenciais comerciais da loja.
                       </p>
                     )}
                   </div>
@@ -504,7 +513,7 @@ export default function CheckoutPage() {
               </span>
             </div>
             <p className="mt-2 text-xs text-[#BDBDBD]">
-              {items.reduce((sum, i) => sum + i.qty, 0)} {items.reduce((sum, i) => sum + i.qty, 0) === 1 ? "item" : "itens"} · {fulfillmentMethod === "pickup" ? "Retirada na loja" : shippingQuote?.available ? "Entrega por motoboy" : "Informe o CEP"}
+              {items.reduce((sum, i) => sum + i.qty, 0)} {items.reduce((sum, i) => sum + i.qty, 0) === 1 ? "item" : "itens"} · {fulfillmentMethod === "pickup" ? "Retirada na loja" : shippingQuote?.available ? shippingQuote.method === "motoboy" ? "Entrega por motoboy" : `Entrega pelos Correios${shippingQuote.service_name ? ` ${shippingQuote.service_name}` : ""}` : "Informe o CEP"}
             </p>
           </div>
 

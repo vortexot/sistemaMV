@@ -63,6 +63,7 @@ class ShippingAddress(ShippingAddressIn):
 class ShippingQuoteIn(BaseModel):
     model_config = ConfigDict(extra='forbid')
     postal_code: str = Field(min_length=8, max_length=9)
+    quantity: int = Field(default=1, ge=1, le=99)
 
 
 class ShippingQuoteOut(BaseModel):
@@ -71,6 +72,9 @@ class ShippingQuoteOut(BaseModel):
     fee: float | None
     distance_km: float | None
     origin_store: str | None
+    service_code: str | None = None
+    service_name: str | None = None
+    delivery_days: int | None = None
     postal_code: str
     street: str
     neighborhood: str
@@ -116,6 +120,9 @@ class Order(BaseModel):
     shipping_method: Literal['motoboy', 'correios'] | None = None
     shipping_distance_km: float | None = None
     shipping_origin: str | None = None
+    shipping_service_code: str | None = None
+    shipping_service_name: str | None = None
+    shipping_delivery_days: int | None = None
     shipping_address: ShippingAddress | None = None
     status: str = "aguardando_pagamento"
     payment_method: str | None = None

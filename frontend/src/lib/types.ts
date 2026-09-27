@@ -125,6 +125,9 @@ export interface ShippingQuote {
   fee: number | null;
   distance_km: number | null;
   origin_store: string | null;
+  service_code: string | null;
+  service_name: string | null;
+  delivery_days: number | null;
   postal_code: string;
   street: string;
   neighborhood: string;
@@ -146,6 +149,9 @@ export interface Order {
   shipping_method: "motoboy" | "correios" | null;
   shipping_distance_km: number | null;
   shipping_origin: string | null;
+  shipping_service_code: string | null;
+  shipping_service_name: string | null;
+  shipping_delivery_days: number | null;
   shipping_address: ShippingAddress | null;
   status: string;
   payment_method: string | null;

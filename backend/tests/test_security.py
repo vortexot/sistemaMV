@@ -366,7 +366,7 @@ async def test_invalid_financial_fields_and_state(secure):
 
 
 async def test_order_price_ownership_idempotency_and_conflict(secure, monkeypatch):
-    async def local_quote(_postal_code):
+    async def local_quote(_postal_code, _quantity=1):
         return {
             'method': 'motoboy', 'available': True, 'fee': 9, 'distance_km': 0,
             'origin_store': 'Valparaíso de Goiás', 'postal_code': '72871059',
@@ -398,7 +398,7 @@ async def test_order_price_ownership_idempotency_and_conflict(secure, monkeypatc
 
 
 async def test_delivery_fee_is_recalculated_by_server(secure, monkeypatch):
-    async def local_quote(_postal_code):
+    async def local_quote(_postal_code, _quantity=1):
         return {
             'method': 'motoboy', 'available': True, 'fee': 9, 'distance_km': 0,
             'origin_store': 'Valparaíso de Goiás', 'postal_code': '72871059',

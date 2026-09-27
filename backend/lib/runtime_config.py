@@ -153,6 +153,19 @@ def validate_production_config() -> None:
         if environment == 'staging' and os.getenv('PAYPAL_MODE') != 'sandbox':
             problems.append('staging can only use PAYPAL_MODE=sandbox')
 
+    if os.getenv('CORREIOS_ENABLED', 'false') == 'true':
+        delegated = os.getenv('CORREIOS_ACCESS_TOKEN', '').strip()
+        credentials = all(os.getenv(key, '').strip() for key in (
+            'CORREIOS_USERNAME', 'CORREIOS_API_CODE', 'CORREIOS_POSTING_CARD',
+            'CORREIOS_CONTRACT', 'CORREIOS_DR',
+        ))
+        if not delegated and not credentials:
+            problems.append('Correios requires an access token or complete business credentials when enabled')
+        if os.getenv('CORREIOS_ENV') not in {'homologation', 'production'}:
+            problems.append('CORREIOS_ENV must be homologation or production')
+        if environment == 'staging' and os.getenv('CORREIOS_ENV') != 'homologation':
+            problems.append('staging can only use Correios homologation')
+
     reset_url = os.getenv('RESET_WEBHOOK_URL', '')
     if reset_url and (not _strong_secret(os.getenv('RESET_WEBHOOK_TOKEN', ''))
                       or not os.getenv('RESET_WEBHOOK_ALLOWED_HOSTS', '').strip()):
