@@ -141,6 +141,13 @@ def test_resend_email_configuration(monkeypatch):
         validate_production_config()
 
 
+def test_production_rejects_demo_registration(monkeypatch):
+    _production(monkeypatch)
+    monkeypatch.setenv('DEMO_SKIP_EMAIL_VERIFICATION', 'true')
+    with pytest.raises(RuntimeError, match='cannot be enabled in production'):
+        validate_production_config()
+
+
 def test_enabled_correios_requires_credentials(monkeypatch):
     _production(monkeypatch)
     monkeypatch.setenv('CORREIOS_ENABLED', 'true')

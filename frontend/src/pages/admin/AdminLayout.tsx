@@ -1,6 +1,8 @@
 import { Link, NavLink, Navigate, Outlet, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+  AlertTriangle,
   BarChart3,
   Boxes,
   Image as ImageIcon,
@@ -13,7 +15,8 @@ import {
 } from "lucide-react";
 
 import { endSession, useSession } from "@/lib/session";
-import { ROLE_LABELS, type Role } from "@/lib/types";
+import { apiGet } from "@/lib/api";
+import { ROLE_LABELS, type RegistrationPolicy, type Role } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { publicAsset } from "@/lib/assets";
 import { Button } from "@/components/ui/button";
@@ -65,6 +68,11 @@ function BrandBlock() {
 export default function AdminLayout() {
   const { user, isLoading } = useSession();
   const navigate = useNavigate();
+  const { data: registrationPolicy } = useQuery({
+    queryKey: ["registration-policy"],
+    queryFn: () => apiGet<RegistrationPolicy>("/auth/registration-policy"),
+    staleTime: 60_000,
+  });
 
   if (isLoading) {
     return (
@@ -193,6 +201,22 @@ export default function AdminLayout() {
 
       <main className="min-w-0 lg:pl-64">
         <div className="mx-auto min-w-0 max-w-6xl p-4 sm:p-8">
+          {registrationPolicy?.demo_mode && (
+            <div
+              role="alert"
+              data-testid="demo-registration-warning"
+              className="mb-5 flex gap-3 rounded-lg border border-amber-400/45 bg-amber-400/10 p-4 text-sm text-amber-100"
+            >
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
+              <div>
+                <p className="font-bold uppercase tracking-wide">Modo de demonstração ativo</p>
+                <p className="mt-1 text-amber-100/80">
+                  Cadastros estão sendo liberados sem confirmação por e-mail. Antes da auditoria ou produção,
+                  desative DEMO_SKIP_EMAIL_VERIFICATION e configure a Resend.
+                </p>
+              </div>
+            </div>
+          )}
           <PageTransition>
             <Outlet />
           </PageTransition>

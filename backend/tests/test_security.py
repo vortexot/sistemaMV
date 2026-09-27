@@ -216,6 +216,49 @@ async def test_registration_requires_single_use_email_verification_and_binds_cre
     assert first_token not in str(await secure.db.email_verification_tokens.find({}).to_list(None))
 
 
+async def test_demo_registration_is_staging_only_and_skips_email(secure, monkeypatch):
+    monkeypatch.setenv('APP_ENV', 'staging')
+    monkeypatch.setenv('DEMO_SKIP_EMAIL_VERIFICATION', 'true')
+    for key in ('AUTH_EMAIL_WEBHOOK_URL', 'AUTH_EMAIL_WEBHOOK_TOKEN', 'AUTH_EMAIL_WEBHOOK_ALLOWED_HOSTS'):
+        monkeypatch.delenv(key, raising=False)
+    email = 'demo-buyer@example.com'
+
+    policy = await secure.api.get('/api/auth/registration-policy')
+    assert policy.json() == {'email_verification_required': False, 'demo_mode': True}
+    response = await secure.api.post('/api/auth/register', json={
+        'name': 'Demo Buyer', 'email': email, 'password': PASSWORD,
+    })
+    assert response.status_code == 202
+    assert response.json() == {
+        'message': 'Conta criada. Você já pode entrar.',
+        'verification_required': False,
+    }
+    assert not secure.delivery
+    assert (await secure.api.post('/api/auth/login', json={
+        'email': email, 'password': PASSWORD,
+    })).status_code == 200
+
+    monkeypatch.setenv('DEMO_SKIP_EMAIL_VERIFICATION', 'false')
+    assert (await secure.api.get('/api/auth/me')).status_code == 403
+    assert (await secure.api.post('/api/auth/login', json={
+        'email': email, 'password': PASSWORD,
+    })).status_code == 403
+
+    configure_auth_email(monkeypatch)
+    assert (await secure.api.post('/api/auth/register', json={
+        'name': 'Demo Buyer', 'email': email, 'password': PASSWORD,
+    })).status_code == 202
+    token = secure.delivery[-1]['token']
+    assert (await secure.api.post('/api/auth/verify-email', json={
+        'token': token, 'password': PASSWORD,
+    })).status_code == 200
+    converted = await secure.db.users.find_one({'email': email})
+    assert converted['email_verified'] is True and 'demo_account' not in converted
+    assert (await secure.api.post('/api/auth/login', json={
+        'email': email, 'password': PASSWORD,
+    })).status_code == 200
+
+
 async def test_registration_and_resend_do_not_enumerate_accounts(secure, monkeypatch):
     configure_auth_email(monkeypatch)
     body = {'name': 'Synthetic Buyer', 'password': PASSWORD}

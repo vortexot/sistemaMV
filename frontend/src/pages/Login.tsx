@@ -76,11 +76,20 @@ export default function Login() {
 
   const registerMutation = useMutation({
     mutationFn: (body: { name: string; email: string; password: string }) =>
-      apiPost<{ message: string }>("/auth/register", body),
+      apiPost<{ message: string; verification_required: boolean }>("/auth/register", body),
     onSuccess: (data) => {
-      setVerificationRequested(true);
-      setVerificationToken("");
       toast.success(data.message);
+      if (data.verification_required) {
+        setVerificationRequested(true);
+        setVerificationToken("");
+        return;
+      }
+      setLoginEmail(regEmail.trim());
+      setLoginPassword("");
+      setRegName("");
+      setRegEmail("");
+      setRegPassword("");
+      setTab("login");
     },
     onError: (error) => toast.error(apiErrorMessage(error)),
   });

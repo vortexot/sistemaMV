@@ -54,3 +54,9 @@ Use primeiro em staging. Registre evidência, responsável e data em cada item. 
 - [ ] Backup/restore remoto foi comprovado.
 - [ ] Alertas foram recebidos por pessoa responsável.
 - [ ] Pentest independente foi autorizado, executado e seus achados tratados antes de produção.
+
+# Bloqueio obrigatório antes da produção
+
+- [ ] Confirmar `DEMO_SKIP_EMAIL_VERIFICATION=false` no Render.
+- [ ] Confirmar que o aviso “Modo de demonstração ativo” não aparece no painel administrativo.
+- [ ] Testar cadastro e recuperação de senha com entrega real pela Resend.

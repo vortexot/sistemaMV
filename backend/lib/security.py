@@ -121,6 +121,13 @@ async def is_revoked(jti: str) -> bool:
     return await db.revoked_tokens.find_one({"jti": jti}) is not None
 
 
+def demo_access_enabled() -> bool:
+    return (
+        os.getenv('APP_ENV') == 'staging'
+        and os.getenv('DEMO_SKIP_EMAIL_VERIFICATION', 'false').lower() == 'true'
+    )
+
+
 async def get_current_user(request: Request) -> dict:
     token = request.cookies.get(ACCESS_COOKIE)
     if not token:
@@ -135,6 +142,8 @@ async def get_current_user(request: Request) -> dict:
     user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0})
     if not user or user.get("status") != "ativo" or await is_revoked(payload['jti']):
         raise HTTPException(status_code=401, detail="Não autenticado")
+    if user.get('demo_account') is True and not demo_access_enabled():
+        raise HTTPException(status_code=403, detail='Conta de demonstração desativada. Confirme seu e-mail.')
     if user.get('role') == 'comprador' and user.get('email_verified') is not True:
         raise HTTPException(status_code=403, detail='Confirme seu e-mail antes de continuar.')
     if payload.get("tv", 0) != user.get("token_version", 0):

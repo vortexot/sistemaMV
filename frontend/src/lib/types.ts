@@ -173,6 +173,11 @@ export interface PaymentStatus {
   pix_key: string | null;
 }
 
+export interface RegistrationPolicy {
+  email_verification_required: boolean;
+  demo_mode: boolean;
+}
+
 export interface PaypalApproval {
   order_id: string;
   approval_url: string;

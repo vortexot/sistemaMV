@@ -62,6 +62,16 @@ class ResendVerificationIn(AuthInput):
     password: str = Field(min_length=1, max_length=128)
 
 
+class RegistrationOut(BaseModel):
+    message: str
+    verification_required: bool
+
+
+class RegistrationPolicyOut(BaseModel):
+    email_verification_required: bool
+    demo_mode: bool
+
+
 class ResetPasswordIn(AuthInput):
     token: str = Field(min_length=32, max_length=200)
     new_password: str = Field(min_length=15, max_length=72)

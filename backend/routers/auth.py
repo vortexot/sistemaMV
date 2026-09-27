@@ -31,6 +31,7 @@ from lib.security import (
     create_access_token,
     create_refresh_token,
     decode_token,
+    demo_access_enabled,
     get_current_user,
     hash_password,
     is_revoked,
@@ -55,6 +56,8 @@ from models.auth import (
     PasswordChangeIn,
     ReauthenticateIn,
     RegisterIn,
+    RegistrationOut,
+    RegistrationPolicyOut,
     ResendVerificationIn,
     ResetPasswordIn,
     UserPublic,
@@ -163,11 +166,21 @@ async def _rate_limit_login_failure(email: str, maximum: int = 10) -> None:
         raise HTTPException(429, 'Muitas tentativas. Aguarde alguns minutos.')
 
 
-@router.post("/register", response_model=MessageOut, status_code=202)
-async def register(input: RegisterIn, request: Request) -> MessageOut:
+@router.get('/registration-policy', response_model=RegistrationPolicyOut)
+async def registration_policy() -> RegistrationPolicyOut:
+    demo_mode = demo_access_enabled()
+    return RegistrationPolicyOut(
+        email_verification_required=not demo_mode,
+        demo_mode=demo_mode,
+    )
+
+
+@router.post("/register", response_model=RegistrationOut, status_code=202)
+async def register(input: RegisterIn, request: Request) -> RegistrationOut:
     email = input.email.lower().strip()
     await _rate_limit(request, 'register', email, 3)
-    if not email_delivery_configured():
+    demo_mode = demo_access_enabled()
+    if not demo_mode and not email_delivery_configured():
         raise HTTPException(503, 'Confirmação por e-mail indisponível. Tente novamente mais tarde.')
 
     password_hash = await _hash_password(input.password)
@@ -181,7 +194,9 @@ async def register(input: RegisterIn, request: Request) -> MessageOut:
             "role": "comprador",
             "status": "ativo",
             "picture": None,
-            "email_verified": False,
+            "email_verified": demo_mode,
+            **({"email_verified_at": utcnow()} if demo_mode else {}),
+            **({"demo_account": True} if demo_mode else {}),
             "token_version": 0,
             "created_at": utcnow(),
         }
@@ -190,12 +205,35 @@ async def register(input: RegisterIn, request: Request) -> MessageOut:
         except DuplicateKeyError:
             user = await db.users.find_one({"email": email}, {"_id": 0})
 
+    if demo_mode:
+        if user and not _email_verified(user):
+            await db.users.update_one(
+                {'id': user['id'], 'email_verified': {'$ne': True}},
+                {'$set': {
+                    'name': input.name.strip(),
+                    'password_hash': password_hash,
+                    'email_verified': True,
+                    'email_verified_at': utcnow(),
+                    'demo_account': True,
+                }, '$inc': {'token_version': 1}},
+            )
+            await db.email_verification_tokens.update_many(
+                {'user_id': user['id'], 'used': False},
+                {'$set': {'used': True, 'superseded_at': utcnow()}},
+            )
+        audit_event('REGISTRATION_ACCEPTED', target_id=subject_hash(email), outcome='demo_auto_verified')
+        return RegistrationOut(message='Conta criada. Você já pode entrar.', verification_required=False)
+
     raw_token = None
     action = 'registration_notice'
-    if user and not _email_verified(user):
+    if user and (not _email_verified(user) or user.get('demo_account') is True):
         await db.users.update_one(
-            {'id': user['id'], 'email_verified': {'$ne': True}},
-            {'$set': {'name': input.name.strip(), 'password_hash': password_hash}},
+            {'id': user['id']},
+            {'$set': {
+                'name': input.name.strip(),
+                'password_hash': password_hash,
+                'email_verified': False,
+            }},
         )
         user = {**user, 'name': input.name.strip(), 'password_hash': password_hash}
         raw_token = await _create_email_verification(user, input.name.strip(), password_hash)
@@ -206,7 +244,7 @@ async def register(input: RegisterIn, request: Request) -> MessageOut:
             await db.email_verification_tokens.delete_one({'token': hashlib.sha256(raw_token.encode()).hexdigest()})
         raise HTTPException(503, 'Confirmação por e-mail indisponível. Tente novamente mais tarde.')
     audit_event('EMAIL_VERIFICATION_SENT', target_id=subject_hash(email), outcome='accepted')
-    return MessageOut(message=GENERIC_REGISTRATION_MESSAGE)
+    return RegistrationOut(message=GENERIC_REGISTRATION_MESSAGE, verification_required=True)
 
 
 @router.post('/verify-email', response_model=MessageOut)
@@ -236,7 +274,7 @@ async def verify_email(input: EmailVerificationIn, request: Request) -> MessageO
                 'email_verified_at': utcnow(),
                 'name': token['pending_name'],
                 'password_hash': token['pending_password_hash'],
-            }, '$inc': {'token_version': 1}},
+            }, '$unset': {'demo_account': ''}, '$inc': {'token_version': 1}},
             session=session,
         )
         if not updated.modified_count:
@@ -281,6 +319,9 @@ async def login(input: LoginIn, request: Request, response: Response) -> UserPub
         await _rate_limit_login_failure(email)
         audit_event('LOGIN_FAILURE', target_id=subject_hash(email), outcome='invalid_credentials')
         raise HTTPException(status_code=401, detail="E-mail ou senha inválidos.")
+    if user.get('demo_account') is True and not demo_access_enabled():
+        audit_event('LOGIN_FAILURE', target_id=user['id'], outcome='demo_account_disabled')
+        raise HTTPException(status_code=403, detail='Conta de demonstração desativada. Confirme seu e-mail.')
     if not _email_verified(user):
         audit_event('LOGIN_FAILURE', target_id=user['id'], outcome='email_unverified')
         raise HTTPException(status_code=403, detail='Confirme seu e-mail antes de entrar.')
@@ -312,6 +353,7 @@ async def refresh(request: Request, response: Response) -> UserPublic:
     if (
         not user
         or user.get("status") != "ativo"
+        or (user.get('demo_account') is True and not demo_access_enabled())
         or not _email_verified(user)
         or payload.get("tv", 0) != user.get("token_version", 0)
     ):

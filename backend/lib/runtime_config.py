@@ -126,6 +126,8 @@ def validate_production_config() -> None:
             problems.append('MFA_ENCRYPTION_KEY_PREVIOUS must be a different valid Fernet key when set')
     if os.getenv('MFA_REQUIRED') != 'true':
         problems.append('MFA_REQUIRED=true is required in production')
+    if environment == 'production' and os.getenv('DEMO_SKIP_EMAIL_VERIFICATION', 'false').lower() == 'true':
+        problems.append('DEMO_SKIP_EMAIL_VERIFICATION cannot be enabled in production')
 
     email_provider = os.getenv('AUTH_EMAIL_PROVIDER', 'webhook').strip().lower()
     if email_provider not in {'webhook', 'resend'}:
