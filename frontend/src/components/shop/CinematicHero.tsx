@@ -133,7 +133,7 @@ export default function CinematicHero() {
           <Link to="/#destaques" data-testid="hero-explore-btn" className="cinematic-primary cinematic-reveal">
             Explorar destaques <ArrowRight aria-hidden="true" size={18} />
           </Link>
-          <Link to="/#colecao" className="cinematic-secondary cinematic-reveal">Ver coleção <span aria-hidden="true">↗</span></Link>
+          <Link to="/#colecao" className="cinematic-secondary cinematic-reveal">Ver coleção</Link>
         </div>
       </div>
       <div className="cinematic-caption cinematic-reveal" aria-hidden="true"><span>ATITUDE EM CADA DETALHE</span><span>MV / MULTIMARCAS</span></div>
