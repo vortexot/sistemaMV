@@ -27,9 +27,23 @@ const DEMO_PAYMENT_OPTIONS = [
   { id: "pix", label: "Pix", description: "QR Code ilustrativo", icon: QrCode },
   { id: "card", label: "Cartão", description: "Crédito ou débito", icon: CreditCard },
   { id: "paypal", label: "PayPal", description: "Redirecionamento simulado", icon: ExternalLink },
+  { id: "store", label: "Pagar na loja", description: "Pagamento na retirada", icon: Store },
 ] as const;
 
 type DemoPaymentMethod = (typeof DEMO_PAYMENT_OPTIONS)[number]["id"];
+
+const DEMO_PAYMENT_ACTIONS: Record<DemoPaymentMethod, string> = {
+  pix: "Gerar QR Code de demonstração",
+  card: "Simular pagamento no cartão",
+  paypal: "Simular redirecionamento PayPal",
+  store: "Simular pagamento na loja",
+};
+
+const DEMO_PAYMENT_RESULTS: Record<Exclude<DemoPaymentMethod, "pix">, string> = {
+  card: "Pagamento no cartão simulado",
+  paypal: "Redirecionamento ao PayPal simulado",
+  store: "Pagamento presencial na loja selecionado",
+};
 
 export default function CheckoutPage() {
   const { items, clear } = useCart();
@@ -516,7 +530,7 @@ export default function CheckoutPage() {
                       <legend className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-[#BDBDBD]">
                         Forma de pagamento
                       </legend>
-                      <div className="grid gap-2 sm:grid-cols-3">
+                      <div className="grid grid-cols-2 gap-2">
                         {DEMO_PAYMENT_OPTIONS.map(({ id, label, description, icon: Icon }) => (
                           <button
                             key={id}
@@ -524,6 +538,7 @@ export default function CheckoutPage() {
                             aria-pressed={demoPaymentMethod === id}
                             onClick={() => {
                               setDemoPaymentMethod(id);
+                              if (id === "store") setFulfillmentMethod("pickup");
                               setDemoPaymentPreview(false);
                             }}
                             className={`rounded-lg border p-3 text-left transition-colors ${
@@ -547,11 +562,7 @@ export default function CheckoutPage() {
                       onClick={startDemoPayment}
                       className="w-full bg-[#DAA520] font-bold uppercase tracking-wide text-[#0B0B0B] hover:bg-[#A07C1B]"
                     >
-                      {demoPaymentMethod === "pix"
-                        ? "Gerar QR Code de demonstração"
-                        : demoPaymentMethod === "card"
-                          ? "Simular pagamento no cartão"
-                          : "Simular redirecionamento PayPal"}
+                      {DEMO_PAYMENT_ACTIONS[demoPaymentMethod]}
                     </Button>
 
                     {demoPaymentPreview && (
@@ -571,7 +582,7 @@ export default function CheckoutPage() {
                           </>
                         ) : (
                           <p className="text-sm font-bold text-emerald-300">
-                            {demoPaymentMethod === "card" ? "Pagamento no cartão simulado" : "Redirecionamento ao PayPal simulado"}
+                            {DEMO_PAYMENT_RESULTS[demoPaymentMethod]}
                           </p>
                         )}
                         <p className="mt-2 text-xs text-emerald-100/80">Nenhuma transação ou pedido foi criado.</p>
