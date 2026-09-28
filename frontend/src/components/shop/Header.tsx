@@ -207,7 +207,6 @@ export default function Header() {
                   >
                     <span className="text-[9px] tracking-[0.2em] text-[#726C61]">0{index + 1}</span>
                     <span className="font-heading text-lg font-semibold uppercase tracking-wide text-[#EDE8DE] transition-colors group-hover:text-[#E7B84B]">{link.label}</span>
-                    <span aria-hidden="true" className="ml-auto text-[#E7B84B] transition-transform group-hover:translate-x-1">↗</span>
                   </Link>
                 ))}
               </nav>
