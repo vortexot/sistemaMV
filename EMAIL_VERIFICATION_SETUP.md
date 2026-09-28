@@ -1,6 +1,6 @@
 # Entrega de verificação de e-mail
 
-> **Auditoria obrigatória:** `DEMO_SKIP_EMAIL_VERIFICATION=true` existe apenas para apresentação no staging. Antes de auditoria, homologação final ou produção, altere para `false`, configure a entrega real e confirme que o painel administrativo não exibe o aviso de modo de demonstração. O backend recusa iniciar em `production` quando essa opção está ativa. Contas criadas nesse modo são marcadas como demonstração e ficam bloqueadas quando ele é desligado, até que o titular confirme o e-mail.
+> **Auditoria obrigatória:** `DEMO_SKIP_EMAIL_VERIFICATION=true` existe apenas para apresentação no staging. Nesse modo, o checkout exibe pagamentos simulados e a API bloqueia pedidos e cobranças reais. Antes de auditoria, homologação final ou produção, altere para `false`, configure a entrega e os pagamentos reais e confirme que o painel administrativo não exibe o aviso de modo de demonstração. O backend recusa iniciar em `production` quando essa opção está ativa. Contas criadas nesse modo são marcadas como demonstração e ficam bloqueadas quando ele é desligado, até que o titular confirme o e-mail.
 
 ## Opção recomendada: Resend
 

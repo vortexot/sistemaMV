@@ -171,6 +171,7 @@ export interface PaymentStatus {
   paypal_mode: string | null;
   pix_configured: boolean;
   pix_key: string | null;
+  demo_mode: boolean;
 }
 
 export interface RegistrationPolicy {

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, Lock, ShieldCheck, ShoppingBag, Store, Truck } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CreditCard, ExternalLink, Lock, QrCode, ShieldCheck, ShoppingBag, Store, Truck } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 
 import { apiErrorMessage, apiGet, apiPost } from "@/lib/api";
@@ -22,6 +23,14 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import EmptyState from "@/components/shop/EmptyState";
 import ProductImage from "@/components/shop/ProductImage";
 
+const DEMO_PAYMENT_OPTIONS = [
+  { id: "pix", label: "Pix", description: "QR Code ilustrativo", icon: QrCode },
+  { id: "card", label: "Cartão", description: "Crédito ou débito", icon: CreditCard },
+  { id: "paypal", label: "PayPal", description: "Redirecionamento simulado", icon: ExternalLink },
+] as const;
+
+type DemoPaymentMethod = (typeof DEMO_PAYMENT_OPTIONS)[number]["id"];
+
 export default function CheckoutPage() {
   const { items, clear } = useCart();
   const { user, isLoading: sessionLoading } = useSession();
@@ -40,6 +49,8 @@ export default function CheckoutPage() {
     complement: "",
   });
   const [shippingQuote, setShippingQuote] = useState<ShippingQuote | null>(null);
+  const [demoPaymentMethod, setDemoPaymentMethod] = useState<DemoPaymentMethod>("pix");
+  const [demoPaymentPreview, setDemoPaymentPreview] = useState(false);
 
   useEffect(() => {
     sessionStorage.setItem("mv-fulfillment-method", fulfillmentMethod);
@@ -53,6 +64,7 @@ export default function CheckoutPage() {
   const paypalConfigured = paymentsQuery.data?.paypal_configured === true;
   const paypalMode = paymentsQuery.data?.paypal_mode ?? null;
   const pixConfigured = paymentsQuery.data?.pix_configured === true;
+  const demoMode = paymentsQuery.data?.demo_mode === true;
   const shippingFee = fulfillmentMethod === "delivery" && shippingQuote?.available ? shippingQuote.fee ?? 0 : 0;
   const checkoutTotal = total + shippingFee;
   const deliveryReady = fulfillmentMethod === "pickup" || (shippingQuote?.available === true && !!shippingAddress.number);
@@ -186,6 +198,15 @@ export default function CheckoutPage() {
       return;
     }
     pixFlow.mutate();
+  };
+
+  const startDemoPayment = () => {
+    if (!deliveryReady) {
+      toast("Calcule o frete e informe o número antes de continuar.");
+      return;
+    }
+    setDemoPaymentPreview(true);
+    toast.success("Simulação concluída. Nenhuma cobrança ou pedido foi criado.");
   };
 
   if (sessionLoading) {
@@ -482,6 +503,83 @@ export default function CheckoutPage() {
               </div>
             ) : (
               <div className="mt-5 space-y-5">
+                {demoMode ? (
+                  <div className="space-y-4" data-testid="demo-payment-area">
+                    <div className="rounded-lg border border-[#DAA520]/40 bg-[#DAA520]/10 p-3">
+                      <p className="text-sm font-bold text-[#F4D77C]">Modo de demonstração</p>
+                      <p className="mt-1 text-xs leading-relaxed text-[#D8D0B8]">
+                        Nenhuma cobrança, pedido ou reserva de estoque será criada. Não informe dados reais.
+                      </p>
+                    </div>
+
+                    <fieldset>
+                      <legend className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-[#BDBDBD]">
+                        Forma de pagamento
+                      </legend>
+                      <div className="grid gap-2 sm:grid-cols-3">
+                        {DEMO_PAYMENT_OPTIONS.map(({ id, label, description, icon: Icon }) => (
+                          <button
+                            key={id}
+                            type="button"
+                            aria-pressed={demoPaymentMethod === id}
+                            onClick={() => {
+                              setDemoPaymentMethod(id);
+                              setDemoPaymentPreview(false);
+                            }}
+                            className={`rounded-lg border p-3 text-left transition-colors ${
+                              demoPaymentMethod === id
+                                ? "border-[#DAA520] bg-[#DAA520]/10 text-white"
+                                : "border-[#343434] bg-[#111] text-[#BDBDBD] hover:border-[#DAA520]/50"
+                            }`}
+                          >
+                            <Icon className="h-5 w-5 text-[#DAA520]" />
+                            <span className="mt-2 block text-sm font-bold">{label}</span>
+                            <span className="mt-1 block text-[11px] leading-snug">{description}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </fieldset>
+
+                    <Button
+                      type="button"
+                      data-testid="demo-payment-button"
+                      disabled={!deliveryReady}
+                      onClick={startDemoPayment}
+                      className="w-full bg-[#DAA520] font-bold uppercase tracking-wide text-[#0B0B0B] hover:bg-[#A07C1B]"
+                    >
+                      {demoPaymentMethod === "pix"
+                        ? "Gerar QR Code de demonstração"
+                        : demoPaymentMethod === "card"
+                          ? "Simular pagamento no cartão"
+                          : "Simular redirecionamento PayPal"}
+                    </Button>
+
+                    {demoPaymentPreview && (
+                      <div role="status" className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-center">
+                        {demoPaymentMethod === "pix" ? (
+                          <>
+                            <p className="text-sm font-bold text-emerald-300">QR Code ilustrativo — não pagável</p>
+                            <div className="mx-auto mt-3 w-fit rounded-lg bg-white p-2">
+                              <QRCodeSVG
+                                value="MV-MULTIMARCAS|DEMONSTRACAO|NAO-PAGAVEL"
+                                size={156}
+                                level="M"
+                                marginSize={1}
+                                title="QR Code de demonstração não pagável"
+                              />
+                            </div>
+                          </>
+                        ) : (
+                          <p className="text-sm font-bold text-emerald-300">
+                            {demoPaymentMethod === "card" ? "Pagamento no cartão simulado" : "Redirecionamento ao PayPal simulado"}
+                          </p>
+                        )}
+                        <p className="mt-2 text-xs text-emerald-100/80">Nenhuma transação ou pedido foi criado.</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <>
                 {pixConfigured && (
                   <div className="space-y-3" data-testid="pix-available-area">
                     <p className="text-sm text-emerald-400">
@@ -546,6 +644,8 @@ export default function CheckoutPage() {
                     {paymentsQuery.isFetching ? "Verificando…" : "Tentar verificar novamente"}
                   </Button>
                 )}
+                  </>
+                )}
                 <p className="flex items-start gap-2 text-xs text-[#BDBDBD]">
                   <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#DAA520]" />
                   Entre em contato com a loja se precisar de ajuda para concluir seu pedido.
@@ -574,16 +674,18 @@ export default function CheckoutPage() {
           </Link>
         </aside>
       </div>
-      {(pixConfigured || paypalConfigured) && (
+      {(demoMode || pixConfigured || paypalConfigured) && (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#DAA520]/30 bg-[#0B0B0B] px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] lg:hidden">
           <Button
             type="button"
-            disabled={(pixConfigured ? pixFlow.isPending : paypalFlow.isPending) || !deliveryReady}
-            onClick={pixConfigured ? startPixPayment : startPayment}
-            aria-busy={pixConfigured ? pixFlow.isPending : paypalFlow.isPending}
+            disabled={!deliveryReady || (!demoMode && (pixConfigured ? pixFlow.isPending : paypalFlow.isPending))}
+            onClick={demoMode ? startDemoPayment : pixConfigured ? startPixPayment : startPayment}
+            aria-busy={!demoMode && (pixConfigured ? pixFlow.isPending : paypalFlow.isPending)}
             className="mx-auto flex w-full max-w-md bg-[#DAA520] font-bold uppercase tracking-wide text-[#0B0B0B] hover:bg-[#A07C1B]"
           >
-            {pixConfigured
+            {demoMode
+              ? "Simular pagamento — sem cobrança"
+              : pixConfigured
               ? pixFlow.isPending ? "Criando pedido…" : `Pagar ${brl(checkoutTotal)} via Pix`
               : paymentButtonLabel}
           </Button>

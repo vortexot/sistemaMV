@@ -568,6 +568,17 @@ async def test_emergency_pause(secure, monkeypatch):
     assert await secure.db.orders.count_documents({}) == 0
 
 
+async def test_demo_mode_exposes_preview_and_blocks_real_orders(secure, monkeypatch):
+    monkeypatch.setenv('APP_ENV', 'staging')
+    monkeypatch.setenv('DEMO_SKIP_EMAIL_VERIFICATION', 'true')
+    status = (await secure.api.get('/api/payments/status')).json()
+    assert status['demo_mode'] is True
+    response = await secure.api.post('/api/orders', json=cart(), headers=secure.headers())
+    assert response.status_code == 503
+    assert 'demonstração' in response.json()['detail']
+    assert await secure.db.orders.count_documents({}) == 0
+
+
 async def test_manual_pix_requires_login_and_admin_confirmation(secure, monkeypatch):
     monkeypatch.setenv('PAYMENTS_PAUSED', 'true')
     monkeypatch.setenv('PIX_ENABLED', 'true')

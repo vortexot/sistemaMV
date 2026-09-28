@@ -59,4 +59,5 @@ Use primeiro em staging. Registre evidência, responsável e data em cada item. 
 
 - [ ] Confirmar `DEMO_SKIP_EMAIL_VERIFICATION=false` no Render.
 - [ ] Confirmar que o aviso “Modo de demonstração ativo” não aparece no painel administrativo.
+- [ ] Confirmar que o checkout real substituiu Pix/cartão/PayPal simulados e criar um pedido de homologação com credenciais sandbox.
 - [ ] Testar cadastro e recuperação de senha com entrega real pela Resend.

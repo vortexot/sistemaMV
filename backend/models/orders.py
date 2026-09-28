@@ -143,6 +143,7 @@ class PaymentStatusOut(BaseModel):
     paypal_mode: str | None = None
     pix_configured: bool = False
     pix_key: str | None = None
+    demo_mode: bool = False
 
 
 class PaypalCreateIn(BaseModel):

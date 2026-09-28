@@ -17,7 +17,7 @@ from lib.paypal import capture_order as paypal_capture, create_order as paypal_c
 from lib.paypal import paypal_configured, paypal_mode
 from lib.pix import normalize_phone_key, pix_payload
 from lib.shipping import shipping_quote as get_shipping_quote
-from lib.security import get_current_user
+from lib.security import demo_access_enabled, get_current_user
 from models.orders import (
     Order,
     OrderCreate,
@@ -143,6 +143,8 @@ def pix_key() -> str:
 
 
 def available(payment_method: str = 'paypal'):
+    if demo_access_enabled():
+        raise HTTPException(503, 'Pagamentos reais desativados no modo de demonstração.')
     configured = pix_configured() if payment_method == 'pix' else paypal_configured()
     if not configured:
         raise HTTPException(503, 'Pagamentos indisponíveis no momento.')
@@ -157,6 +159,7 @@ async def payments_status():
         paypal_mode=paypal_mode() if configured else None,
         pix_configured=pix_available,
         pix_key=pix_key() if pix_available else None,
+        demo_mode=demo_access_enabled(),
     )
 
 
