@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { LogIn, Menu, Search, ShoppingBag, UserRound, X } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { useSession } from "@/lib/session";
@@ -31,10 +31,38 @@ export default function Header() {
   const { user } = useSession();
   const { count } = useCart();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [searchParams] = useSearchParams();
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [term, setTerm] = useState(searchParams.get("q") ?? "");
+  const [heroScrollProgress, setHeroScrollProgress] = useState(pathname === "/" ? 0 : 1);
+  const isHome = pathname === "/";
+
+  useEffect(() => {
+    if (!isHome) {
+      setHeroScrollProgress(1);
+      return;
+    }
+
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      setHeroScrollProgress(Math.min(1, window.scrollY / Math.max(window.innerHeight * 0.72, 1)));
+    };
+    const scheduleUpdate = () => {
+      if (!frame) frame = window.requestAnimationFrame(update);
+    };
+
+    update();
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", scheduleUpdate);
+    return () => {
+      window.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
+      window.cancelAnimationFrame(frame);
+    };
+  }, [isHome]);
 
   // Keep the field in sync when the URL changes (filter cleared on the page, back/forward…).
   useEffect(() => {
@@ -134,7 +162,15 @@ export default function Header() {
   return (
     <header
       data-testid="shop-header"
-      className="fixed inset-x-0 top-0 z-50 border-b border-[#DAA520]/25 bg-[#0B0B0B]/94 pt-[env(safe-area-inset-top)] shadow-[0_1px_0_rgba(218,165,32,0.06)] backdrop-blur-xl"
+      data-scroll-state={!isHome || heroScrollProgress >= 0.98 ? "solid" : heroScrollProgress <= 0.02 ? "top" : "transition"}
+      className="fixed inset-x-0 top-0 z-50 border-b pt-[env(safe-area-inset-top)] transition-[background-color,border-color,box-shadow,backdrop-filter] duration-150 ease-linear"
+      style={{
+        backgroundColor: `rgba(11, 11, 11, ${0.18 + heroScrollProgress * 0.74})`,
+        borderBottomColor: `rgba(218, 165, 32, ${0.04 + heroScrollProgress * 0.16})`,
+        boxShadow: `0 1px 0 rgba(0, 0, 0, ${heroScrollProgress * 0.16})`,
+        backdropFilter: `blur(${2 + heroScrollProgress * 6}px)`,
+        WebkitBackdropFilter: `blur(${2 + heroScrollProgress * 6}px)`,
+      }}
     >
       <div className="mx-auto flex h-[4.25rem] max-w-7xl items-center gap-2 px-3 sm:px-6 md:h-20 md:gap-4 md:px-8">
         <BrandMark testId="header-logo" className="shrink-0 gap-2 [&_img]:h-9 [&_img]:w-9 md:gap-3 md:[&_img]:h-11 md:[&_img]:w-11 max-[359px]:gap-0 max-[359px]:[&_[data-slot=brand-wordmark]]:hidden" />
