@@ -18,6 +18,42 @@ load_dotenv(ROOT_DIR / '.env')
 # MongoDB connection
 from lib.db import client, db, ensure_indexes
 from lib.runtime_config import cors_origins, validate_production_config
+from lib.security import demo_admin_access_enabled, hash_password
+from lib.dates import utcnow
+
+
+async def ensure_demo_admin() -> None:
+    if not demo_admin_access_enabled():
+        return
+    email = os.getenv('DEMO_ADMIN_EMAIL', '').strip().lower()
+    password = os.getenv('DEMO_ADMIN_PASSWORD', '')
+    if '@' not in email or len(password) < 8 or len(os.getenv('DEMO_ADMIN_MFA_CODE', '')) < 6:
+        raise RuntimeError('Configure DEMO_ADMIN_EMAIL, DEMO_ADMIN_PASSWORD and DEMO_ADMIN_MFA_CODE.')
+    await db.users.update_one(
+        {'email': email},
+        {
+            '$set': {
+                'name': os.getenv('DEMO_ADMIN_NAME', 'Administrador Demo').strip(),
+                'password_hash': await asyncio.to_thread(hash_password, password),
+                'role': 'admin',
+                'status': 'ativo',
+                'picture': None,
+                'email_verified': True,
+                'email_verified_at': utcnow(),
+                'mfa_enabled': True,
+                'mfa_secret': '',
+                'mfa_recovery_codes': [],
+                'demo_account': True,
+                'demo_static_mfa': True,
+            },
+            '$setOnInsert': {
+                'id': 'demo-admin',
+                'token_version': 0,
+                'created_at': utcnow(),
+            },
+        },
+        upsert=True,
+    )
 
 
 # Startup runs before the yield, shutdown after it. Add your own setup/teardown here.
@@ -25,6 +61,7 @@ from lib.runtime_config import cors_origins, validate_production_config
 async def lifespan(app: FastAPI):
     validate_production_config()
     await ensure_indexes()  # Uniqueness and revocation indexes are security prerequisites.
+    await ensure_demo_admin()
     if os.getenv('APP_ENV') in {'staging', 'production'}:
         unready = await db.users.count_documents({
             'role': {'$in': ['admin', 'atendente']}, 'status': 'ativo', 'mfa_enabled': {'$ne': True},

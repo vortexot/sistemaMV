@@ -128,6 +128,14 @@ def demo_access_enabled() -> bool:
     )
 
 
+def demo_admin_access_enabled() -> bool:
+    return (
+        os.getenv('APP_ENV', 'development') in {'development', 'staging', 'test'}
+        and os.getenv('DEMO_ADMIN_ACCESS', 'false').lower() == 'true'
+        and os.getenv('PAYMENTS_PAUSED', 'true').lower() == 'true'
+    )
+
+
 async def get_current_user(request: Request) -> dict:
     token = request.cookies.get(ACCESS_COOKIE)
     if not token:
@@ -142,6 +150,8 @@ async def get_current_user(request: Request) -> dict:
     user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0})
     if not user or user.get("status") != "ativo" or await is_revoked(payload['jti']):
         raise HTTPException(status_code=401, detail="Não autenticado")
+    if user.get('demo_static_mfa') is True and not demo_admin_access_enabled():
+        raise HTTPException(status_code=403, detail='Acesso administrativo provisório desativado.')
     if user.get('demo_account') is True and not demo_access_enabled():
         raise HTTPException(status_code=403, detail='Conta de demonstração desativada. Confirme seu e-mail.')
     if user.get('role') == 'comprador' and user.get('email_verified') is not True:

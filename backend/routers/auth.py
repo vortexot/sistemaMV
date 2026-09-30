@@ -31,6 +31,7 @@ from lib.security import (
     create_access_token,
     create_refresh_token,
     decode_token,
+    demo_admin_access_enabled,
     demo_access_enabled,
     get_current_user,
     hash_password,
@@ -319,6 +320,9 @@ async def login(input: LoginIn, request: Request, response: Response) -> UserPub
         await _rate_limit_login_failure(email)
         audit_event('LOGIN_FAILURE', target_id=subject_hash(email), outcome='invalid_credentials')
         raise HTTPException(status_code=401, detail="E-mail ou senha inválidos.")
+    if user.get('demo_static_mfa') is True and not demo_admin_access_enabled():
+        audit_event('LOGIN_FAILURE', target_id=user['id'], outcome='demo_admin_disabled')
+        raise HTTPException(status_code=403, detail='Acesso administrativo provisório desativado.')
     if user.get('demo_account') is True and not demo_access_enabled():
         audit_event('LOGIN_FAILURE', target_id=user['id'], outcome='demo_account_disabled')
         raise HTTPException(status_code=403, detail='Conta de demonstração desativada. Confirme seu e-mail.')
@@ -353,6 +357,7 @@ async def refresh(request: Request, response: Response) -> UserPublic:
     if (
         not user
         or user.get("status") != "ativo"
+        or (user.get('demo_static_mfa') is True and not demo_admin_access_enabled())
         or (user.get('demo_account') is True and not demo_access_enabled())
         or not _email_verified(user)
         or payload.get("tv", 0) != user.get("token_version", 0)

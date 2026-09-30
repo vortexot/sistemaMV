@@ -579,6 +579,19 @@ async def test_demo_mode_exposes_preview_and_blocks_real_orders(secure, monkeypa
     assert await secure.db.orders.count_documents({}) == 0
 
 
+async def test_static_demo_admin_mfa_is_staging_only(secure, monkeypatch):
+    user = {'mfa_enabled': True, 'demo_static_mfa': True}
+    monkeypatch.setenv('APP_ENV', 'staging')
+    monkeypatch.setenv('DEMO_SKIP_EMAIL_VERIFICATION', 'true')
+    monkeypatch.setenv('DEMO_ADMIN_ACCESS', 'true')
+    monkeypatch.setenv('DEMO_ADMIN_MFA_CODE', '000000')
+    monkeypatch.setenv('PAYMENTS_PAUSED', 'true')
+    assert await mfa.verify_second_factor(user, '000000') is True
+
+    monkeypatch.setenv('APP_ENV', 'production')
+    assert await mfa.verify_second_factor(user, '000000') is False
+
+
 async def test_manual_pix_requires_login_and_admin_confirmation(secure, monkeypatch):
     monkeypatch.setenv('PAYMENTS_PAUSED', 'true')
     monkeypatch.setenv('PIX_ENABLED', 'true')
